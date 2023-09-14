@@ -1,0 +1,47 @@
+import { Controller, Post, UseGuards, Get, Request } from "@nestjs/common"
+import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger"
+import type { AuthService } from "./auth.service"
+import type { LoginDto, RegisterDto } from "./dto/auth.dto"
+import { JwtAuthGuard } from "./guards/jwt-auth.guard"
+
+@ApiTags("auth")
+@Controller("auth")
+export class AuthController {
+  constructor(private readonly authService: AuthService) {}
+
+  @Post("register")
+  @ApiOperation({ summary: "Register a new user" })
+  register(registerDto: RegisterDto) {
+    return this.authService.register(registerDto)
+  }
+
+  @Post("login")
+  @ApiOperation({ summary: "Login user" })
+  login(loginDto: LoginDto) {
+    return this.authService.login(loginDto)
+  }
+
+  @Post('refresh')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Refresh access token' })
+  refresh(@Request() req) {
+    return this.authService.refreshToken(req.user.id);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Logout user' })
+  logout(@Request() req) {
+    return this.authService.logout(req.user.id);
+  }
+
+  @Get('profile')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user profile' })
+  getProfile(@Request() req) {
+    return req.user;
+  }
+}

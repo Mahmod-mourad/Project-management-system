@@ -7,11 +7,11 @@ WORKDIR /app
 RUN npm install -g pnpm@9.15.4
 
 # Install dependencies
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml /app/
 RUN pnpm install --frozen-lockfile
 
 # Build application
-COPY . .
+COPY . /app/
 RUN npm run build
 
 # Runtime Stage
@@ -26,11 +26,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN apk add --no-cache dumb-init
 
 # Copy built application from builder
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/pnpm-lock.yaml ./pnpm-lock.yaml
+COPY --from=builder /app/.next /app/.next
+COPY --from=builder /app/public /app/public
+COPY --from=builder /app/node_modules /app/node_modules
+COPY --from=builder /app/package.json /app/package.json
+COPY --from=builder /app/pnpm-lock.yaml /app/pnpm-lock.yaml
 
 EXPOSE 3000
 

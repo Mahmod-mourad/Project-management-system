@@ -1,6 +1,17 @@
-import { Injectable, type CanActivate, type ExecutionContext, UnauthorizedException } from "@nestjs/common"
+import { Injectable, type CanActivate, type ExecutionContext, ForbiddenException, UnauthorizedException } from "@nestjs/common"
 import type { SupabaseService } from "../services/supabase.service"
 
+/**
+ * Resolves the tenant named by the x-tenant-id header and confirms the caller
+ * actually belongs to it.
+ *
+ * The header is client supplied, so checking only that the tenant exists is not
+ * enough: any signed-in user could read another tenant's data by changing the
+ * header. The authenticated profile carries the tenant the user was created
+ * under, and that is the value the request has to match.
+ *
+ * Must run after JwtAuthGuard, which is what puts the profile on the request.
+ */
 @Injectable()
 export class TenantGuard implements CanActivate {
   constructor(private supabaseService: SupabaseService) {}
@@ -13,7 +24,16 @@ export class TenantGuard implements CanActivate {
       throw new UnauthorizedException("Tenant ID is required")
     }
 
-    // Verify tenant exists and user has access
+    const user = request.user
+
+    if (!user?.tenant_id) {
+      throw new UnauthorizedException("Authenticated user has no tenant")
+    }
+
+    if (user.tenant_id !== tenantId) {
+      throw new ForbiddenException("Tenant does not match the authenticated user")
+    }
+
     const { data: tenant } = await this.supabaseService.client
       .from("tenants")
       .select("*")

@@ -4,12 +4,15 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "next lint",
-    "test": "jest --watch",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "test:ci": "jest --ci --coverage",
-    "test:coverage": "jest --coverage"
+    "test:backend": "pnpm --filter erp-backend test",
+    "test:integration": "jest --config jest.integration.config.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -96,5 +99,6 @@
     "ts-jest": "^29.1.1",
     "tw-animate-css": "1.3.3",
     "typescript": "^5"
-  }
+  },
+  "packageManager": "pnpm@11.21.0"
 }

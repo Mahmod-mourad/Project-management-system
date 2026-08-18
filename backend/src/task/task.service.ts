@@ -78,7 +78,7 @@ export class TaskService {
 
     if (error) throw error
 
-    const statusCounts = data.reduce((acc, task) => {
+    const statusCounts = data.reduce<Record<string, number>>((acc, task) => {
       acc[task.status] = (acc[task.status] || 0) + 1
       return acc
     }, {})

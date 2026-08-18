@@ -5,9 +5,6 @@ import { TenantModule } from "./tenant/tenant.module"
 import { UserModule } from "./user/user.module"
 import { ProjectModule } from "./project/project.module"
 import { TaskModule } from "./task/task.module"
-import { InventoryModule } from "./inventory/inventory.module"
-import { FinanceModule } from "./finance/finance.module"
-import { ReportsModule } from "./reports/reports.module"
 import { NotificationModule } from "./notification/notification.module"
 import { SupabaseModule } from "./supabase/supabase.module"
 
@@ -23,9 +20,6 @@ import { SupabaseModule } from "./supabase/supabase.module"
     UserModule,
     ProjectModule,
     TaskModule,
-    InventoryModule,
-    FinanceModule,
-    ReportsModule,
     NotificationModule,
   ],
 })

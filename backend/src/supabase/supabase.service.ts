@@ -47,32 +47,4 @@ export class SupabaseService implements OnModuleInit {
     )
   }
 
-  // Helper method for RLS-enabled queries
-  async withRLS<T>(userId: string, tenantId: string, operation: (client: SupabaseClient) => Promise<T>): Promise<T> {
-    const client = createClient(
-      this.configService.get<string>("SUPABASE_URL")!,
-      this.configService.get<string>("SUPABASE_ANON_KEY")!,
-      {
-        global: {
-          headers: {
-            Authorization: `Bearer ${await this.generateUserToken(userId)}`,
-            "x-tenant-id": tenantId,
-          },
-        },
-      },
-    )
-
-    return operation(client)
-  }
-
-  private async generateUserToken(userId: string): Promise<string> {
-    // Generate JWT token for user authentication
-    const { data, error } = await this.supabase.auth.admin.generateLink({
-      type: "magiclink",
-      email: `user-${userId}@temp.com`,
-    })
-
-    if (error) throw error
-    return data.properties?.access_token || ""
-  }
 }

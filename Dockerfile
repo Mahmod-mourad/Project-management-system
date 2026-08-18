@@ -1,21 +1,24 @@
 # Frontend Build Stage
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm@9.15.4
+# corepack installs the pnpm version pinned in package.json ("packageManager"),
+# so the image and CI never drift from the lockfile.
+RUN corepack enable
 
-# Install dependencies
-COPY package.json pnpm-lock.yaml /app/
-RUN pnpm install --frozen-lockfile
+# The lockfile covers the whole workspace, so every workspace manifest has to be
+# present before install or --frozen-lockfile fails.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY backend/package.json ./backend/package.json
+RUN pnpm install --frozen-lockfile --filter project-management-system
 
 # Build application
-COPY . /app/
-RUN npm run build
+COPY . .
+RUN pnpm build
 
 # Runtime Stage
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -38,4 +41,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["npm", "start"]
+CMD ["node_modules/.bin/next", "start"]

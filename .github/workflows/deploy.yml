@@ -1,8 +1,9 @@
 name: Deploy to Production
 
+# Manual only. This pipeline needs DOCKER_USERNAME/DOCKER_PASSWORD and a
+# PRODUCTION_HOST to push and deploy to. Until those exist it is run on demand
+# rather than on every push, so it does not report a failure it cannot avoid.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -35,7 +36,7 @@ jobs:
       - name: Build and push backend
         uses: docker/build-push-action@v5
         with:
-          context: ./backend
+          context: .
           file: ./backend/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/erp-backend:latest,${{ secrets.DOCKER_USERNAME }}/erp-backend:${{ github.sha }}
@@ -50,10 +51,9 @@ jobs:
           key: ${{ secrets.PRODUCTION_SSH_KEY }}
           script: |
             cd /opt/erp-system
-            docker-compose pull
-            docker-compose up -d
-            docker-compose exec -T backend npm run migration:run
-            docker-compose logs -f
+            docker compose pull
+            docker compose up -d
+            docker compose ps
 
       - name: Notify deployment
         if: always()

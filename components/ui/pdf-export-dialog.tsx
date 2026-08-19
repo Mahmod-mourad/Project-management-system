@@ -41,21 +41,30 @@ interface ExportOptions {
   description: string
 }
 
+/** Defaults the export window to the last thirty days, as YYYY-MM-DD. */
+function defaultDateRange(): { from: string; to: string } {
+  const to = new Date()
+  const from = new Date()
+  from.setDate(from.getDate() - 30)
+
+  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) }
+}
+
 export function PDFExportDialog({ open, onOpenChange, title, data = [], onExport }: PDFExportDialogProps) {
-  const [exportOptions, setExportOptions] = useState<ExportOptions>({
+  const [exportOptions, setExportOptions] = useState<ExportOptions>(() => ({
     format: "pdf",
     orientation: "portrait",
     pageSize: "a4",
     includeCharts: true,
     includeImages: true,
-    dateRange: {
-      from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-      to: new Date().toISOString().split("T")[0],
-    },
+    // Computed in the initialiser rather than inline: reading the clock during
+    // render is impure, and it also produced a different default on the server
+    // than on the client.
+    dateRange: defaultDateRange(),
     columns: [],
     title: title,
     description: "",
-  })
+  }))
 
   const availableColumns = data.length > 0 ? Object.keys(data[0]) : []
 

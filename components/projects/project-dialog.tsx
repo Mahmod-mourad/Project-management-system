@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 import type { CreateProjectInput, Project } from "@/lib/types"
 import { Button } from "@/components/ui/button"
@@ -35,38 +35,24 @@ const STATUSES: Project["status"][] = [
 
 const PRIORITIES: Project["priority"][] = ["low", "medium", "high", "urgent"]
 
-const EMPTY = {
-  name: "",
-  description: "",
-  status: "planning" as Project["status"],
-  priority: "medium" as Project["priority"],
-  start_date: "",
-  end_date: "",
+/** Form state seeded from the project being edited, or blank for a new one. */
+function initialValues(project: Project | null) {
+  return {
+    name: project?.name ?? "",
+    description: project?.description ?? "",
+    status: project?.status ?? ("planning" as Project["status"]),
+    priority: project?.priority ?? ("medium" as Project["priority"]),
+    // <input type="date"> only accepts YYYY-MM-DD.
+    start_date: project?.start_date?.slice(0, 10) ?? "",
+    end_date: project?.end_date?.slice(0, 10) ?? "",
+  }
 }
 
 export function ProjectDialog({ open, project, onOpenChange, onSubmit }: ProjectDialogProps) {
-  const [values, setValues] = useState(EMPTY)
+  const [values, setValues] = useState(() => initialValues(project))
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!open) return
-
-    setError(null)
-    setValues(
-      project
-        ? {
-            name: project.name,
-            description: project.description ?? "",
-            status: project.status,
-            priority: project.priority,
-            // <input type="date"> only accepts YYYY-MM-DD.
-            start_date: project.start_date?.slice(0, 10) ?? "",
-            end_date: project.end_date?.slice(0, 10) ?? "",
-          }
-        : EMPTY,
-    )
-  }, [open, project])
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()

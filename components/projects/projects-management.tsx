@@ -213,6 +213,9 @@ export function ProjectsManagement() {
       </Card>
 
       <ProjectDialog
+        // Remounts when the target changes, so the form re-seeds from props
+        // instead of syncing itself in an effect.
+        key={editing?.id ?? "new"}
         open={dialogOpen}
         project={editing}
         onOpenChange={setDialogOpen}

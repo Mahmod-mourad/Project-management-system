@@ -24,9 +24,15 @@ export function useNotifications() {
 
   const socket = useSocket("/notifications")
 
-  const fetchNotifications = async () => {
+  /**
+   * Reloads from the API.
+   *
+   * `showSpinner` is false on the first load — `loading` already starts true, and
+   * setting it again synchronously inside the mount effect costs an extra render.
+   */
+  const fetchNotifications = async (showSpinner = true) => {
     try {
-      setLoading(true)
+      if (showSpinner) setLoading(true)
       const data: Notification[] = await apiClient.getNotifications()
       setNotifications(data)
       setUnreadCount(data.filter((notification) => !notification.read).length)
@@ -75,7 +81,31 @@ export function useNotifications() {
   }, [socket])
 
   useEffect(() => {
-    fetchNotifications()
+    let cancelled = false
+
+    const load = async () => {
+      try {
+        const data: Notification[] = await apiClient.getNotifications()
+        if (cancelled) return
+
+        setNotifications(data)
+        setUnreadCount(data.filter((notification) => !notification.read).length)
+        setError(null)
+      } catch (err) {
+        if (cancelled) return
+        setError(err instanceof Error ? err.message : "Failed to fetch notifications")
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    load()
+
+    // Nothing here is set synchronously, and a cancelled flag stops a slow
+    // response writing state after the component has gone.
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   return {

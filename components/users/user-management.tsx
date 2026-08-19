@@ -169,6 +169,9 @@ export function UserManagement() {
           create-user endpoint, and inventing one in the UI would be a button that
           does nothing. */}
       <UserDialog
+        // Remounts when the target changes, so the form re-seeds from props
+        // instead of syncing itself in an effect.
+        key={selectedUser?.id ?? "new"}
         open={isDialogOpen}
         user={selectedUser}
         onOpenChange={setIsDialogOpen}

@@ -12,6 +12,7 @@ export function useProjects() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  /** Reloads from the API. Used by the refresh button and after a mutation. */
   const fetchProjects = async () => {
     try {
       setLoading(true)
@@ -55,7 +56,29 @@ export function useProjects() {
   }
 
   useEffect(() => {
-    fetchProjects()
+    let cancelled = false
+
+    const load = async () => {
+      try {
+        const data = await apiClient.getProjects()
+        if (!cancelled) {
+          setProjects(data)
+          setError(null)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to fetch projects")
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    load()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   return {

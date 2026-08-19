@@ -235,6 +235,9 @@ export function TaskBoard({ projectId, title = "Tasks" }: TaskBoardProps) {
       </div>
 
       <TaskDialog
+        // Remounts when the target changes, so the form re-seeds from props
+        // instead of syncing itself in an effect.
+        key={editing?.id ?? "new"}
         open={dialogOpen}
         task={editing}
         projects={projects}

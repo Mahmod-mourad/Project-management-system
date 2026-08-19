@@ -1,15 +1,11 @@
-import { dirname } from 'path'
-import { fileURLToPath } from 'url'
-import { FlatCompat } from '@eslint/eslintrc'
+import next from 'eslint-config-next'
 
-const compat = new FlatCompat({
-  baseDirectory: dirname(fileURLToPath(import.meta.url)),
-})
-
-export default [
+const config = [
   {
     // The NestJS app has its own lint setup and its own tsconfig.
     ignores: ['.next/**', 'node_modules/**', 'next-env.d.ts', 'backend/**'],
   },
-  ...compat.extends('next/core-web-vitals', 'next/typescript'),
+  ...next,
 ]
+
+export default config

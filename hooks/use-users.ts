@@ -21,6 +21,7 @@ export function useUsers() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  /** Reloads from the API. Used by the refresh button and after a mutation. */
   const fetchUsers = async () => {
     try {
       setLoading(true)
@@ -53,7 +54,29 @@ export function useUsers() {
   }
 
   useEffect(() => {
-    fetchUsers()
+    let cancelled = false
+
+    const load = async () => {
+      try {
+        const data = await apiClient.getUsers()
+        if (!cancelled) {
+          setUsers(data)
+          setError(null)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to fetch users")
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    load()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   return { users, loading, error, fetchUsers, updateUser, deleteUser }

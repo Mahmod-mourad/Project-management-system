@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 import type { User } from "@/hooks/use-users"
 import { Button } from "@/components/ui/button"
@@ -25,28 +25,16 @@ interface UserDialogProps {
 const ROLES = ["admin", "manager", "member"]
 
 export function UserDialog({ open, user, onOpenChange, onSubmit }: UserDialogProps) {
-  const [values, setValues] = useState({
-    full_name: "",
-    email: "",
-    phone: "",
-    department: "",
-    role: "member",
-  })
+  const [values, setValues] = useState(() => ({
+    full_name: user?.full_name ?? "",
+    email: user?.email ?? "",
+    phone: user?.phone ?? "",
+    department: user?.department ?? "",
+    role: user?.role ?? "member",
+  }))
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!open || !user) return
-
-    setError(null)
-    setValues({
-      full_name: user.full_name ?? "",
-      email: user.email,
-      phone: user.phone ?? "",
-      department: user.department ?? "",
-      role: user.role,
-    })
-  }, [open, user])
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()

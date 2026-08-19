@@ -47,40 +47,70 @@ export default function TenantManagement() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<CreateTenantInput>({ name: "", domain: "", status: "active" })
 
-  const load = async () => {
+  /**
+   * Fetches the tenant list plus each tenant's counts.
+   *
+   * Counts are one request per tenant, settled independently — a failure there
+   * leaves that row's numbers blank rather than failing the whole page.
+   */
+  const fetchTenants = async () => {
+    const list = await apiClient.getTenants()
+
+    const results = await Promise.allSettled(
+      list.map(async (tenant) => [tenant.id, await apiClient.getTenantStats(tenant.id)] as const),
+    )
+
+    const counts = Object.fromEntries(
+      results
+        .filter((r): r is PromiseFulfilledResult<readonly [string, TenantStats]> =>
+          r.status === "fulfilled",
+        )
+        .map((r) => r.value),
+    )
+
+    return { list, counts }
+  }
+
+  // The initial load lives inside the effect so nothing is set synchronously when
+  // it runs, and a cancelled flag stops a slow response writing state after the
+  // component has gone.
+  useEffect(() => {
+    let cancelled = false
+
+    fetchTenants()
+      .then(({ list, counts }) => {
+        if (cancelled) return
+        setTenants(list)
+        setStats(counts)
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        setError(err instanceof Error ? err.message : "Could not load tenants")
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  /** Reload after a create. Not called during render, so the spinner is fine here. */
+  const reload = async () => {
     setLoading(true)
     setError(null)
 
     try {
-      const list = await apiClient.getTenants()
+      const { list, counts } = await fetchTenants()
       setTenants(list)
-
-      // Counts are per tenant and each is its own request. They load alongside the
-      // list rather than blocking it, and a failure just leaves that row's counts
-      // blank instead of failing the page.
-      const results = await Promise.allSettled(
-        list.map(async (tenant) => [tenant.id, await apiClient.getTenantStats(tenant.id)] as const),
-      )
-
-      setStats(
-        Object.fromEntries(
-          results
-            .filter((r): r is PromiseFulfilledResult<readonly [string, TenantStats]> =>
-              r.status === "fulfilled",
-            )
-            .map((r) => r.value),
-        ),
-      )
+      setStats(counts)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load tenants")
     } finally {
       setLoading(false)
     }
   }
-
-  useEffect(() => {
-    load()
-  }, [])
 
   const create = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -97,7 +127,7 @@ export default function TenantManagement() {
 
       setDialogOpen(false)
       setForm({ name: "", domain: "", status: "active" })
-      await load()
+      await reload()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create the tenant")
     } finally {

@@ -12,6 +12,7 @@ export function useTasks(projectId?: string) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  /** Reloads from the API. Used by the refresh button and after a mutation. */
   const fetchTasks = async () => {
     try {
       setLoading(true)
@@ -63,7 +64,29 @@ export function useTasks(projectId?: string) {
   }
 
   useEffect(() => {
-    fetchTasks()
+    let cancelled = false
+
+    const load = async () => {
+      try {
+        const data = await apiClient.getTasks(projectId)
+        if (!cancelled) {
+          setTasks(data)
+          setError(null)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to fetch tasks")
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    load()
+
+    return () => {
+      cancelled = true
+    }
   }, [projectId])
 
   return {

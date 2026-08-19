@@ -599,17 +599,23 @@ function SidebarMenuBadge({
   )
 }
 
+const SKELETON_WIDTHS = [58, 72, 65, 84, 51, 77]
+
 function SidebarMenuSkeleton({
   className,
   showIcon = false,
+  index = 0,
   ...props
 }: React.ComponentProps<'div'> & {
   showIcon?: boolean
+  /** Position in the placeholder list; picks which bar width to use. */
+  index?: number
 }) {
-  // Random width between 50 to 90%.
-  const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`
-  }, [])
+  // Skeleton bars vary in width so the placeholder looks like text rather than a
+  // solid block. This used Math.random() during render, which produced a
+  // different value on the server than on the client — a hydration mismatch on
+  // top of the lint error. The width is now derived from the row index.
+  const width = React.useMemo(() => `${SKELETON_WIDTHS[index % SKELETON_WIDTHS.length]}%`, [index])
 
   return (
     <div

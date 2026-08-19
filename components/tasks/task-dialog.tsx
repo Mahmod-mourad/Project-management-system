@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 import type { CreateTaskInput, Project, Task } from "@/lib/types"
 import { Button } from "@/components/ui/button"
@@ -40,30 +40,17 @@ export function TaskDialog({
   onOpenChange,
   onSubmit,
 }: TaskDialogProps) {
-  const [values, setValues] = useState({
-    title: "",
-    description: "",
-    status: "todo" as Task["status"],
-    priority: "medium" as Task["priority"],
-    project_id: NO_PROJECT,
-    due_date: "",
-  })
+  const [values, setValues] = useState(() => ({
+    title: task?.title ?? "",
+    description: task?.description ?? "",
+    status: task?.status ?? ("todo" as Task["status"]),
+    priority: task?.priority ?? ("medium" as Task["priority"]),
+    project_id: task?.project_id ?? defaultProjectId ?? NO_PROJECT,
+    due_date: task?.due_date?.slice(0, 10) ?? "",
+  }))
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!open) return
-
-    setError(null)
-    setValues({
-      title: task?.title ?? "",
-      description: task?.description ?? "",
-      status: task?.status ?? "todo",
-      priority: task?.priority ?? "medium",
-      project_id: task?.project_id ?? defaultProjectId ?? NO_PROJECT,
-      due_date: task?.due_date?.slice(0, 10) ?? "",
-    })
-  }, [open, task, defaultProjectId])
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()

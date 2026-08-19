@@ -14,11 +14,12 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto
 
-    // Authenticate with Supabase
-    const { data: authData, error: authError } = await this.supabaseService.client.auth.signInWithPassword({
-      email,
-      password,
-    })
+    // Deliberately not the shared client: signInWithPassword would leave the
+    // caller's session on it, and every query the API made afterwards would go
+    // out as that user rather than as the service role.
+    const { data: authData, error: authError } = await this.supabaseService
+      .createAuthClient()
+      .auth.signInWithPassword({ email, password })
 
     if (authError) {
       throw new UnauthorizedException("Invalid credentials")

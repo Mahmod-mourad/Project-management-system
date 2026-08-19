@@ -13,9 +13,17 @@ describe("AuthService", () => {
   const select = jest.fn(() => ({ single, eq }))
   const from = jest.fn(() => ({ select }))
 
+  // createAuthClient returns a separate client on purpose: signInWithPassword
+  // stores a session on whichever client it is called on, and the shared one
+  // must keep its service role authorisation for the profile lookup that
+  // follows. The two are distinct here so a regression shows up as the sign-in
+  // landing on the wrong client.
+  const createAuthClient = jest.fn(() => ({ auth: { signInWithPassword } }))
+
   const supabaseService = {
+    createAuthClient,
     client: {
-      auth: { admin: { signOut }, signInWithPassword },
+      auth: { admin: { signOut } },
       from,
     },
   } as unknown as SupabaseService
@@ -57,6 +65,18 @@ describe("AuthService", () => {
     await expect(service.login({ email: "test@example.com", password: "SecurePassword123" })).rejects.toThrow(
       UnauthorizedException,
     )
+  })
+
+  it("verifies the password on a throwaway client, not the shared one", async () => {
+    signInWithPassword.mockResolvedValue({
+      data: { user: { id: "user-1", email: "test@example.com" } },
+      error: null,
+    })
+    single.mockResolvedValue({ data: { id: "user-1", tenant_id: "tenant-1" }, error: null })
+
+    await service.login({ email: "test@example.com", password: "SecurePassword123" })
+
+    expect(createAuthClient).toHaveBeenCalledTimes(1)
   })
 
   it("returns the validated profile", async () => {

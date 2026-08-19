@@ -77,3 +77,24 @@ CREATE TRIGGER trigger_notify_project_update
 
 -- See the note in 01: RLS on, no permissive policy.
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+-- Supabase's PostgREST connects as service_role, which bypasses row level
+-- security but still needs ordinary table privileges. Tables created by running
+-- these scripts with psql do not pick up the default grants Supabase applies to
+-- tables made through its own tooling, so without this every request answers
+-- "permission denied for table ..." with a hint to grant exactly this.
+--
+-- Only service_role. anon and authenticated are the browser-facing roles, and
+-- nothing in this application talks to Supabase from a browser.
+--
+-- Wrapped in a role check so these scripts also run against a plain PostgreSQL,
+-- which is what CI applies them to and where service_role does not exist.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+    EXECUTE 'GRANT USAGE ON SCHEMA public TO service_role';
+    EXECUTE 'GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role';
+    EXECUTE 'GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role';
+  END IF;
+END
+$$;

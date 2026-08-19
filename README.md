@@ -4,16 +4,16 @@ A multi-tenant project management application: a Next.js frontend and a NestJS A
 pnpm workspace, backed by Supabase/PostgreSQL, with Docker Compose for local infrastructure and
 GitHub Actions for build and test.
 
-This README describes what is actually implemented. Sections marked **UI only** are screens built
-against mock data with no API behind them yet.
+This README describes what is actually implemented. Every screen listed below is backed by an
+endpoint that exists — there are no mock-data screens left in the repository.
 
 ## Status
 
 | | |
 | --- | --- |
-| Frontend build | `pnpm build` passes — 15 routes |
+| Frontend build | `pnpm build` passes — 10 routes |
 | Backend build | `pnpm --filter erp-backend build` passes |
-| Unit tests | 33 passing across 4 suites (frontend) + 8 across 2 suites (backend) |
+| Unit tests | 104 passing across 7 suites (frontend) + 21 across 4 suites (backend) |
 | Integration / E2E | Written, needs a running API — not part of CI |
 | Docker images | Frontend and backend images build from the repo root |
 | Deployment | Pipeline is authored but has never run against a live host |
@@ -30,19 +30,23 @@ against mock data with no API behind them yet.
 - `notification` — notification records
 - `supabase` — the shared data-access client
 
-**Frontend (Next.js App Router)** — wired to the API through `lib/api-client.ts`:
+**Frontend (Next.js App Router)** — every screen goes through `lib/api-client.ts`:
 
-- Login and profile
-- Tenant administration (`/admin/tenants`)
-- User management (`/users`)
-- Settings
+- **Dashboard** (`/`) — project and task counts, completion rate, overdue tasks, and status
+  breakdowns, all derived from the projects and tasks the API returns
+- **Projects** (`/projects`) — list with search and status filter; create and edit
+- **Project detail** (`/projects/[id]`) — one project with its stats from
+  `GET /projects/:id/stats`, plus that project's task board
+- **Tasks** (`/tasks`) — a board across to do, in progress, in review and completed. Moving a card
+  patches the task's status optimistically and reverts if the request fails
+- **Tenants** (`/admin/tenants`) — tenant list with per-tenant user, project and task counts, and
+  tenant creation
+- **Users** (`/users`), **Profile**, **Settings**, **Login**
 
-**UI only** — screens exist and render, but read from mock data and have no backend module:
-
-`/companies` · `/inventory` · `/invoices` · `/sales` · `/hr` · `/reports` · `/subscription`
-
-These are the next things to wire up. They are in the repository because the layout and component
-work is real; the data layer behind them is not.
+An earlier version of this repository shipped seven more screens — companies, inventory, invoices,
+sales, HR, reports and subscriptions. Between them they made zero API calls across 4,165 lines:
+each one rendered a hardcoded array. They were removed rather than left in place looking real. The
+backend has never had a module for any of them.
 
 ## Tech stack
 

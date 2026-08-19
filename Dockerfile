@@ -13,6 +13,13 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY backend/package.json ./backend/package.json
 RUN pnpm install --frozen-lockfile --filter project-management-system
 
+# NEXT_PUBLIC_* is inlined into the client bundle at build time, so this has to
+# be a build argument. Passing it as a runtime environment variable, which is
+# what docker-compose used to do, leaves the browser calling whatever the
+# default in lib/api-client.ts was.
+ARG NEXT_PUBLIC_API_URL=http://localhost:3001/api/v1
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 # Build application
 COPY . .
 RUN pnpm build

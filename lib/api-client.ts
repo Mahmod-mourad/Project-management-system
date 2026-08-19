@@ -63,6 +63,9 @@ class ApiClient {
     if (typeof window !== "undefined") {
       localStorage.removeItem("auth_token")
       localStorage.removeItem("tenant_id")
+      // The auth provider caches the signed-in user here. Leaving it behind
+      // after a 401 or a logout means the next page load restores a stale user.
+      localStorage.removeItem("auth-user")
     }
   }
 

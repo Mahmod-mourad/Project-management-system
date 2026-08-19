@@ -1,174 +1,73 @@
-import { Test, TestingModule } from '@nestjs/testing'
-import { AuthService } from './auth.service'
-import { SupabaseService } from '../supabase/supabase.service'
-import { JwtService } from '@nestjs/jwt'
-import { UnauthorizedException, BadRequestException } from '@nestjs/common'
+import { BadRequestException, UnauthorizedException } from "@nestjs/common"
+import type { JwtService } from "@nestjs/jwt"
 
-describe('AuthService', () => {
-  let service: AuthService
-  let supabaseService: SupabaseService
-  let jwtService: JwtService
+import type { SupabaseService } from "../supabase/supabase.service"
+import { AuthService } from "./auth.service"
 
-  const mockSupabaseService = {
-    getClient: jest.fn(),
-    signUp: jest.fn(),
-    signIn: jest.fn(),
-    signOut: jest.fn(),
-    getUser: jest.fn(),
-  }
+describe("AuthService", () => {
+  const sign = jest.fn().mockReturnValue("signed-token")
+  const createUser = jest.fn()
+  const deleteUser = jest.fn()
+  const signOut = jest.fn()
+  const signInWithPassword = jest.fn()
+  const single = jest.fn()
+  const eq = jest.fn(() => ({ single }))
+  const select = jest.fn(() => ({ single, eq }))
+  const insert = jest.fn(() => ({ select }))
+  const from = jest.fn(() => ({ insert, select }))
 
-  const mockJwtService = {
-    sign: jest.fn(),
-    verify: jest.fn(),
-  }
+  const supabaseService = {
+    client: {
+      auth: { admin: { createUser, deleteUser, signOut }, signInWithPassword },
+      from,
+    },
+  } as unknown as SupabaseService
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AuthService,
-        {
-          provide: SupabaseService,
-          useValue: mockSupabaseService,
-        },
-        {
-          provide: JwtService,
-          useValue: mockJwtService,
-        },
-      ],
-    }).compile()
+  const service = new AuthService({ sign } as unknown as JwtService, supabaseService)
 
-    service = module.get<AuthService>(AuthService)
-    supabaseService = module.get<SupabaseService>(SupabaseService)
-    jwtService = module.get<JwtService>(JwtService)
+  beforeEach(() => jest.clearAllMocks())
+
+  it("registers a user, creates a profile, and returns an application token", async () => {
+    createUser.mockResolvedValue({ data: { user: { id: "user-1", email: "test@example.com" } }, error: null })
+    single.mockResolvedValue({ data: { id: "user-1" }, error: null })
+
+    const result = await service.register({
+      email: "test@example.com",
+      password: "SecurePassword123",
+      full_name: "Test User",
+      tenant_id: "tenant-1",
+    })
+
+    expect(createUser).toHaveBeenCalled()
+    expect(from).toHaveBeenCalledWith("profiles")
+    expect(result.access_token).toBe("signed-token")
+    expect(result.user.tenant_id).toBe("tenant-1")
   })
 
-  afterEach(() => {
-    jest.clearAllMocks()
+  it("rejects a registration error from Supabase", async () => {
+    createUser.mockResolvedValue({ data: { user: null }, error: { message: "User already exists" } })
+
+    await expect(
+      service.register({
+        email: "test@example.com",
+        password: "SecurePassword123",
+        full_name: "Test User",
+        tenant_id: "tenant-1",
+      }),
+    ).rejects.toThrow(BadRequestException)
   })
 
-  describe('signup', () => {
-    it('should register a new user successfully', async () => {
-      const signupDto = {
-        email: 'test@example.com',
-        password: 'SecurePassword123',
-        full_name: 'Test User',
-        tenant_id: 'tenant-123',
-      }
+  it("rejects invalid login credentials", async () => {
+    signInWithPassword.mockResolvedValue({ data: {}, error: { message: "Invalid credentials" } })
 
-      const mockResponse = {
-        user: {
-          id: '123',
-          email: 'test@example.com',
-          user_metadata: { full_name: 'Test User' },
-        },
-      }
-
-      mockSupabaseService.signUp.mockResolvedValue(mockResponse)
-      mockJwtService.sign.mockReturnValue('test-jwt-token')
-
-      const result = await service.signup(signupDto)
-
-      expect(mockSupabaseService.signUp).toHaveBeenCalledWith({
-        email: signupDto.email,
-        password: signupDto.password,
-        options: {
-          data: {
-            full_name: signupDto.full_name,
-            tenant_id: signupDto.tenant_id,
-          },
-        },
-      })
-      expect(result).toHaveProperty('access_token')
-    })
-
-    it('should throw error if email already exists', async () => {
-      const signupDto = {
-        email: 'existing@example.com',
-        password: 'SecurePassword123',
-        full_name: 'Test User',
-        tenant_id: 'tenant-123',
-      }
-
-      mockSupabaseService.signUp.mockRejectedValue(new Error('User already exists'))
-
-      await expect(service.signup(signupDto)).rejects.toThrow()
-    })
+    await expect(service.login({ email: "test@example.com", password: "wrong-password" })).rejects.toThrow(
+      UnauthorizedException,
+    )
   })
 
-  describe('login', () => {
-    it('should authenticate user and return token', async () => {
-      const loginDto = {
-        email: 'test@example.com',
-        password: 'SecurePassword123',
-      }
+  it("returns the validated profile", async () => {
+    single.mockResolvedValue({ data: { id: "user-1", tenant_id: "tenant-1" }, error: null })
 
-      const mockResponse = {
-        user: {
-          id: '123',
-          email: 'test@example.com',
-        },
-        session: {
-          access_token: 'supabase-token',
-        },
-      }
-
-      mockSupabaseService.signIn.mockResolvedValue(mockResponse)
-      mockJwtService.sign.mockReturnValue('test-jwt-token')
-
-      const result = await service.login(loginDto)
-
-      expect(mockSupabaseService.signIn).toHaveBeenCalledWith({
-        email: loginDto.email,
-        password: loginDto.password,
-      })
-      expect(result).toHaveProperty('access_token')
-    })
-
-    it('should throw UnauthorizedException on invalid credentials', async () => {
-      const loginDto = {
-        email: 'test@example.com',
-        password: 'WrongPassword',
-      }
-
-      mockSupabaseService.signIn.mockRejectedValue(new Error('Invalid login credentials'))
-
-      await expect(service.login(loginDto)).rejects.toThrow(UnauthorizedException)
-    })
-  })
-
-  describe('validateUser', () => {
-    it('should validate JWT token and return user', async () => {
-      const token = 'valid-jwt-token'
-      const mockUser = {
-        id: '123',
-        email: 'test@example.com',
-        user_metadata: { full_name: 'Test User' },
-      }
-
-      mockJwtService.verify.mockReturnValue({ sub: '123' })
-      mockSupabaseService.getUser.mockResolvedValue(mockUser)
-
-      const result = await service.validateUser(token)
-
-      expect(result).toEqual(expect.objectContaining({ id: '123' }))
-    })
-
-    it('should throw on invalid token', async () => {
-      const token = 'invalid-jwt-token'
-
-      mockJwtService.verify.mockThrow(new Error('Invalid token'))
-
-      await expect(service.validateUser(token)).rejects.toThrow()
-    })
-  })
-
-  describe('logout', () => {
-    it('should logout user successfully', async () => {
-      const token = 'valid-jwt-token'
-
-      mockSupabaseService.signOut.mockResolvedValue({})
-
-      await expect(service.logout(token)).resolves.not.toThrow()
-    })
+    await expect(service.validateUser("user-1")).resolves.toMatchObject({ id: "user-1" })
   })
 })

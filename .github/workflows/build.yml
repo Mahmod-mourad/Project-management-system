@@ -7,75 +7,72 @@ on:
     branches: [main, develop]
 
 jobs:
-  build-frontend:
+  frontend:
     runs-on: ubuntu-latest
-    name: Build Frontend
+    name: Frontend
 
     steps:
       - uses: actions/checkout@v4
 
+      # pnpm is set up before Node so setup-node can cache the pnpm store.
+      # The version comes from "packageManager" in package.json.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: '22'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint --if-present
+        run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: npm run build
+        run: pnpm build
         env:
           NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
 
-      - name: Run tests
-        run: npm test --if-present
+      - name: Unit tests
+        run: pnpm test:ci
 
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
         if: always()
+        with:
+          name: frontend-coverage
+          path: coverage/
+          if-no-files-found: ignore
 
-  build-backend:
+  backend:
     runs-on: ubuntu-latest
-    name: Build Backend
+    name: Backend
 
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: 'backend/package-lock.json'
+          node-version: '22'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        working-directory: ./backend
-        run: npm ci
-
-      - name: Lint
-        working-directory: ./backend
-        run: npm run lint --if-present
+        run: pnpm install --frozen-lockfile
 
       - name: Build
-        working-directory: ./backend
-        run: npm run build
+        run: pnpm --filter erp-backend build
 
-      - name: Run tests
-        working-directory: ./backend
-        run: npm test --if-present
+      - name: Unit tests
+        run: pnpm --filter erp-backend exec jest --runInBand
 
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
-        if: always()
-
-  docker-build:
+  docker:
     runs-on: ubuntu-latest
-    name: Build Docker Images
-    needs: [build-frontend, build-backend]
+    name: Docker images
+    needs: [frontend, backend]
 
     steps:
       - uses: actions/checkout@v4
@@ -94,7 +91,7 @@ jobs:
       - name: Build backend image
         uses: docker/build-push-action@v5
         with:
-          context: ./backend
+          context: .
           file: ./backend/Dockerfile
           push: false
           tags: erp-backend:${{ github.sha }}

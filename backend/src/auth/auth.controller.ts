@@ -4,6 +4,13 @@ import type { AuthService } from "./auth.service"
 import type { LoginDto, RegisterDto } from "./dto/auth.dto"
 import { JwtAuthGuard } from "./guards/jwt-auth.guard"
 
+interface AuthenticatedRequest {
+  user: {
+    id: string
+    [key: string]: unknown
+  }
+}
+
 @ApiTags("auth")
 @Controller("auth")
 export class AuthController {
@@ -25,7 +32,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Refresh access token' })
-  refresh(@Request() req) {
+  refresh(@Request() req: AuthenticatedRequest) {
     return this.authService.refreshToken(req.user.id);
   }
 
@@ -33,7 +40,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Logout user' })
-  logout(@Request() req) {
+  logout(@Request() req: AuthenticatedRequest) {
     return this.authService.logout(req.user.id);
   }
 
@@ -41,7 +48,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user profile' })
-  getProfile(@Request() req) {
+  getProfile(@Request() req: AuthenticatedRequest) {
     return req.user;
   }
 }

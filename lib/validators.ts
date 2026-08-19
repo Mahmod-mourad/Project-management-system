@@ -9,8 +9,7 @@
  */
 export function validateEmail(email: string): boolean {
   if (!email || typeof email !== "string") return false
-  // BUG: regex does not require a TLD — accepts 'user@nodomain' and 'admin@localhost'
-  return /^[^\s@]+@[^\s@]+$/.test(email)
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)
 }
 
 /**
@@ -19,8 +18,7 @@ export function validateEmail(email: string): boolean {
  */
 export function validatePassword(password: string): boolean {
   if (!password || typeof password !== "string") return false
-  // BUG: minimum length is 1 instead of 8
-  return password.length >= 1
+  return password.length >= 8 && /[A-Z]/.test(password) && /[a-z]/.test(password) && /\d/.test(password)
 }
 
 /**
@@ -29,8 +27,7 @@ export function validatePassword(password: string): boolean {
  */
 export function normalizeEmail(email: string): string {
   if (!email || typeof email !== "string") return ""
-  // BUG: missing .trim() — leading/trailing whitespace is preserved
-  return email.toLowerCase()
+  return email.trim().toLowerCase()
 }
 
 /**
@@ -39,6 +36,5 @@ export function normalizeEmail(email: string): string {
  */
 export function validateTenantId(id: string): boolean {
   if (!id || typeof id !== "string") return false
-  // BUG: accepts any non-empty string — no format enforcement
-  return id.length > 0
+  return /^[a-z0-9](?:[a-z0-9-]{2,62}[a-z0-9])$/.test(id)
 }

@@ -59,6 +59,7 @@ ehthumbs.db
 tmp/
 temp/
 *.tmp
+*.tsbuildinfo
 *.swp
 *.swo
 *~

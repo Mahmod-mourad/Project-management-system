@@ -27,12 +27,12 @@ export function useNotifications() {
   const fetchNotifications = async () => {
     try {
       setLoading(true)
-      const data = await apiClient.get("/notifications")
-      setNotifications(data.data)
-      setUnreadCount(data.data.filter((n: Notification) => !n.read).length)
+      const data: Notification[] = await apiClient.getNotifications()
+      setNotifications(data)
+      setUnreadCount(data.filter((notification) => !notification.read).length)
       setError(null)
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to fetch notifications")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch notifications")
     } finally {
       setLoading(false)
     }
@@ -40,21 +40,21 @@ export function useNotifications() {
 
   const markAsRead = async (notificationId: string) => {
     try {
-      await apiClient.patch(`/notifications/${notificationId}/read`)
+      await apiClient.markNotificationRead(notificationId)
       setNotifications((prev) => prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n)))
       setUnreadCount((prev) => Math.max(0, prev - 1))
-    } catch (err: any) {
-      throw new Error(err.response?.data?.message || "Failed to mark notification as read")
+    } catch (err) {
+      throw err instanceof Error ? err : new Error("Failed to mark notification as read")
     }
   }
 
   const markAllAsRead = async () => {
     try {
-      await apiClient.post("/notifications/mark-all-read")
+      await apiClient.markAllNotificationsRead()
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
       setUnreadCount(0)
-    } catch (err: any) {
-      throw new Error(err.response?.data?.message || "Failed to mark all notifications as read")
+    } catch (err) {
+      throw err instanceof Error ? err : new Error("Failed to mark all notifications as read")
     }
   }
 

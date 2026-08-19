@@ -1,368 +1,298 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { useMemo } from "react"
+import Link from "next/link"
 import {
-  BarChart,
   Bar,
+  BarChart,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
 } from "recharts"
-import {
-  TrendingUp,
-  TrendingDown,
-  Users,
-  Package,
-  CreditCard,
-  FileText,
-  RefreshCw,
-  Bell,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-} from "lucide-react"
-import { getSystemAnalytics } from "@/lib/data-integration"
+import { AlertCircle, FolderKanban, ListChecks, RefreshCw } from "lucide-react"
 
-// Fetch real data from API instead of generating random data
-const fetchSalesData = async () => {
-  try {
-    const response = await fetch("/api/reports/sales-data")
-    return await response.json()
-  } catch (error) {
-    console.error("Failed to fetch sales data:", error)
-    return []
-  }
+import { useProjects } from "@/hooks/use-projects"
+import { useTasks, type Task } from "@/hooks/use-tasks"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+
+/**
+ * The dashboard is derived entirely from the projects and tasks the API returns.
+ *
+ * It used to fetch /api/reports/sales-data — a route that does not exist in this
+ * project — and fall back to numbers generated in the browser, charting revenue
+ * and inventory for an application that manages projects and tasks.
+ */
+
+const STATUS_COLOURS: Record<string, string> = {
+  todo: "hsl(215 20% 65%)",
+  in_progress: "hsl(221 83% 53%)",
+  in_review: "hsl(38 92% 50%)",
+  completed: "hsl(142 71% 45%)",
+  cancelled: "hsl(0 72% 51%)",
 }
 
-const fetchRealtimeData = async () => {
-  try {
-    const response = await fetch("/api/reports/realtime-data")
-    return await response.json()
-  } catch (error) {
-    console.error("Failed to fetch realtime data:", error)
-    return []
-  }
+const STATUS_LABELS: Record<string, string> = {
+  todo: "To do",
+  in_progress: "In progress",
+  in_review: "In review",
+  completed: "Completed",
+  cancelled: "Cancelled",
+}
+
+/** Due today is on time. Only a date already past counts as overdue. */
+function isOverdue(task: Task): boolean {
+  if (!task.due_date || task.status === "completed" || task.status === "cancelled") return false
+
+  const due = new Date(task.due_date)
+  due.setHours(23, 59, 59, 999)
+
+  return due.getTime() < Date.now()
 }
 
 export function DashboardOverview() {
-  const [salesData, setSalesData] = useState<any[]>([])
-  const [realtimeData, setRealtimeData] = useState<any[]>([])
-  const [analytics, setAnalytics] = useState<any>(null)
-  const [lastUpdated, setLastUpdated] = useState(new Date())
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [notifications, setNotifications] = useState<any[]>([])
+  const {
+    projects,
+    loading: projectsLoading,
+    error: projectsError,
+    fetchProjects,
+  } = useProjects()
+  const { tasks, loading: tasksLoading, error: tasksError, fetchTasks } = useTasks()
 
-  const pieData = [
-    { name: "المبيعات", value: analytics.totalSales || 400, color: "#0891b2" },
-    { name: "المخزون", value: analytics.totalProducts * 100 || 300, color: "#6366f1" },
-    { name: "المصروفات", value: 200, color: "#22c55e" },
-    { name: "الأرباح", value: Math.floor((analytics.totalSales || 0) * 0.3), color: "#facc15" },
+  const loading = projectsLoading || tasksLoading
+  const error = projectsError ?? tasksError
+
+  const stats = useMemo(() => {
+    const activeProjects = projects.filter(
+      (project) => project.status === "in_progress" || project.status === "planning",
+    ).length
+
+    const completedTasks = tasks.filter((task) => task.status === "completed").length
+    const overdueTasks = tasks.filter(isOverdue).length
+
+    return {
+      totalProjects: projects.length,
+      activeProjects,
+      totalTasks: tasks.length,
+      completedTasks,
+      overdueTasks,
+      // Guarded against an empty task list, which would otherwise be NaN.
+      completionRate: tasks.length ? Math.round((completedTasks / tasks.length) * 100) : 0,
+    }
+  }, [projects, tasks])
+
+  const tasksByStatus = useMemo(() => {
+    const counts = new Map<string, number>()
+
+    for (const task of tasks) {
+      counts.set(task.status, (counts.get(task.status) ?? 0) + 1)
+    }
+
+    return [...counts.entries()].map(([status, value]) => ({
+      status,
+      name: STATUS_LABELS[status] ?? status,
+      value,
+    }))
+  }, [tasks])
+
+  const tasksPerProject = useMemo(() => {
+    const counts = new Map<string, number>()
+
+    for (const task of tasks) {
+      if (!task.project_id) continue
+      counts.set(task.project_id, (counts.get(task.project_id) ?? 0) + 1)
+    }
+
+    return projects
+      .map((project) => ({ name: project.name, tasks: counts.get(project.id) ?? 0 }))
+      .sort((a, b) => b.tasks - a.tasks)
+      .slice(0, 6)
+  }, [projects, tasks])
+
+  const upcoming = useMemo(
+    () =>
+      tasks
+        .filter((task) => task.due_date && task.status !== "completed" && task.status !== "cancelled")
+        .sort((a, b) => (a.due_date ?? "").localeCompare(b.due_date ?? ""))
+        .slice(0, 5),
+    [tasks],
+  )
+
+  const tiles = [
+    { label: "Projects", value: stats.totalProjects, hint: `${stats.activeProjects} active` },
+    { label: "Tasks", value: stats.totalTasks, hint: `${stats.completedTasks} completed` },
+    { label: "Completion", value: `${stats.completionRate}%`, hint: "of all tasks" },
+    {
+      label: "Overdue",
+      value: stats.overdueTasks,
+      hint: stats.overdueTasks ? "needs attention" : "nothing late",
+    },
   ]
-
-  const refreshData = async () => {
-    setIsRefreshing(true)
-    try {
-      const [sales, realtime, analyticsData] = await Promise.all([
-        fetchSalesData(),
-        fetchRealtimeData(),
-        getSystemAnalytics(),
-      ])
-      setSalesData(sales)
-      setRealtimeData(realtime)
-      setAnalytics(analyticsData)
-      setLastUpdated(new Date())
-    } catch (error) {
-      console.error("Failed to refresh dashboard data:", error)
-    } finally {
-      setIsRefreshing(false)
-    }
-  }
-
-  useEffect(() => {
-    // Load initial data
-    refreshData()
-
-    // Set up auto-refresh every 30 seconds
-    const interval = setInterval(refreshData, 30000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case "warning":
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />
-      case "success":
-        return <CheckCircle className="h-4 w-4 text-green-500" />
-      case "info":
-        return <Bell className="h-4 w-4 text-blue-500" />
-      default:
-        return <Bell className="h-4 w-4" />
-    }
-  }
 
   return (
     <div className="space-y-6">
-      {/* Page Header with Real-time Controls */}
-      <div className="flex items-center justify-between">
-        <div className="text-right">
-          <h1 className="text-3xl font-bold text-foreground">لوحة التحكم الرئيسية</h1>
-          <p className="text-muted-foreground mt-2">نظرة عامة على أداء الشركة والإحصائيات الرئيسية</p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground">Where your projects and tasks stand right now.</p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="text-sm text-muted-foreground">آخر تحديث: {lastUpdated.toLocaleTimeString("ar-SA")}</div>
-          <Button onClick={refreshData} disabled={isRefreshing} size="sm" variant="outline">
-            <RefreshCw className={`h-4 w-4 ml-2 ${isRefreshing ? "animate-spin" : ""}`} />
-            تحديث البيانات
+
+        <Button
+          variant="outline"
+          onClick={() => {
+            fetchProjects()
+            fetchTasks()
+          }}
+          disabled={loading}
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-4">
+        {tiles.map((tile) => (
+          <Card key={tile.label}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {tile.label}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <Skeleton className="h-9 w-16" />
+              ) : (
+                <>
+                  <p className="text-3xl font-bold">{tile.value}</p>
+                  <p className="text-xs text-muted-foreground">{tile.hint}</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Tasks by status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-64 w-full" />
+            ) : tasksByStatus.length === 0 ? (
+              <p className="py-20 text-center text-sm text-muted-foreground">No tasks yet</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie data={tasksByStatus} dataKey="value" nameKey="name" outerRadius={90} label>
+                    {tasksByStatus.map((entry) => (
+                      <Cell key={entry.status} fill={STATUS_COLOURS[entry.status] ?? "hsl(215 20% 65%)"} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Tasks per project</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-64 w-full" />
+            ) : tasksPerProject.length === 0 ? (
+              <p className="py-20 text-center text-sm text-muted-foreground">No projects yet</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={tasksPerProject}>
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-15} height={50} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="tasks" fill="hsl(221 83% 53%)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base">Coming up</CardTitle>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/tasks">All tasks</Link>
           </Button>
-        </div>
-      </div>
-
-      {/* Live Notifications */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-right flex items-center gap-2">
-            <Bell className="h-5 w-5" />
-            الإشعارات المباشرة
-          </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {notifications.map((notification) => (
-              <div key={notification.id} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                {getNotificationIcon(notification.type)}
-                <div className="flex-1 text-right">
-                  <p className="text-sm font-medium">{notification.message}</p>
-                </div>
-                <div className="text-xs text-muted-foreground">{notification.time}</div>
-              </div>
-            ))}
-          </div>
+          {loading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : upcoming.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Nothing scheduled. Tasks with a due date show up here.
+            </p>
+          ) : (
+            <ul className="divide-y">
+              {upcoming.map((task) => (
+                <li key={task.id} className="flex items-center justify-between gap-4 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{task.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Due {new Date(task.due_date as string).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isOverdue(task) && <Badge variant="destructive">Overdue</Badge>}
+                    <Badge variant="secondary">{STATUS_LABELS[task.status] ?? task.status}</Badge>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </CardContent>
       </Card>
 
-      {/* Enhanced KPI Cards with Dynamic Data */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-2 h-full bg-green-500"></div>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-right">إجمالي المبيعات</CardTitle>
-            <CreditCard className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-right">{(analytics.totalSales || 45231).toLocaleString()} ر.س</div>
-            <p className="text-xs text-muted-foreground flex items-center justify-end mt-1">
-              <TrendingUp className="h-3 w-3 text-green-500 ml-1" />
-              +20.1% من الشهر الماضي
-            </p>
-            <Badge variant="secondary" className="mt-2">
-              مباشر
-            </Badge>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Button variant="outline" className="h-auto justify-start gap-3 py-4" asChild>
+          <Link href="/projects">
+            <FolderKanban className="h-5 w-5" />
+            <span className="text-left">
+              <span className="block font-medium">Projects</span>
+              <span className="block text-xs text-muted-foreground">Create and track work</span>
+            </span>
+          </Link>
+        </Button>
 
-        <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-2 h-full bg-blue-500"></div>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-right">عدد العملاء</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-right">{analytics.totalUsers || 2350}</div>
-            <p className="text-xs text-muted-foreground flex items-center justify-end mt-1">
-              <TrendingUp className="h-3 w-3 text-green-500 ml-1" />+{analytics.activeUsers || 180} عميل نشط
-            </p>
-            <Badge variant="secondary" className="mt-2">
-              مباشر
-            </Badge>
-          </CardContent>
-        </Card>
-
-        <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-2 h-full bg-yellow-500"></div>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-right">المنتجات المتاحة</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-right">{analytics.totalProducts || 12234}</div>
-            <p className="text-xs text-muted-foreground flex items-center justify-end mt-1">
-              <TrendingDown className="h-3 w-3 text-red-500 ml-1" />-{analytics.lowStockProducts || 19} منتج مخزون منخفض
-            </p>
-            <Badge variant="destructive" className="mt-2">
-              تحذير
-            </Badge>
-          </CardContent>
-        </Card>
-
-        <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-2 h-full bg-purple-500"></div>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-right">الفواتير المعلقة</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-right">{analytics.pendingInvoices || 573}</div>
-            <p className="text-xs text-muted-foreground flex items-center justify-end mt-1">
-              <Clock className="h-3 w-3 text-yellow-500 ml-1" />
-              تحتاج متابعة
-            </p>
-            <Badge variant="outline" className="mt-2">
-              معلق
-            </Badge>
-          </CardContent>
-        </Card>
+        <Button variant="outline" className="h-auto justify-start gap-3 py-4" asChild>
+          <Link href="/tasks">
+            <ListChecks className="h-5 w-5" />
+            <span className="text-left">
+              <span className="block font-medium">Task board</span>
+              <span className="block text-xs text-muted-foreground">Move work across columns</span>
+            </span>
+          </Link>
+        </Button>
       </div>
-
-      {/* Enhanced Charts with Real-time Data */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="col-span-4">
-          <CardHeader>
-            <CardTitle className="text-right">تحليل المبيعات الشهرية</CardTitle>
-            <CardDescription className="text-right">
-              مقارنة المبيعات والأرباح على مدار الأشهر الستة الماضية (يتم التحديث تلقائياً)
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pl-2">
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={salesData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="sales" fill="#0891b2" name="المبيعات" />
-                <Bar dataKey="profit" fill="#6366f1" name="الأرباح" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="col-span-3">
-          <CardHeader>
-            <CardTitle className="text-right">توزيع الإيرادات</CardTitle>
-            <CardDescription className="text-right">نسبة توزيع الإيرادات حسب الأقسام (مباشر)</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Real-time Activity Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-right">النشاط المباشر (24 ساعة)</CardTitle>
-          <CardDescription className="text-right">
-            متابعة الزوار والمبيعات في الوقت الفعلي - يتم التحديث كل 30 ثانية
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={realtimeData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="hour" />
-              <YAxis />
-              <Tooltip />
-              <Line
-                type="monotone"
-                dataKey="visitors"
-                stroke="#0891b2"
-                name="الزوار"
-                strokeWidth={2}
-                dot={{ fill: "#0891b2", strokeWidth: 2, r: 4 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="sales"
-                stroke="#22c55e"
-                name="المبيعات"
-                strokeWidth={2}
-                dot={{ fill: "#22c55e", strokeWidth: 2, r: 4 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      {/* Enhanced Recent Activity */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-right">النشاطات الأخيرة</CardTitle>
-          <CardDescription className="text-right">آخر العمليات والتحديثات في النظام (مباشر)</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {[
-              {
-                action: "تم إنشاء فاتورة جديدة",
-                user: "أحمد محمد",
-                time: "منذ 5 دقائق",
-                type: "invoice",
-                status: "جديد",
-              },
-              {
-                action: "تم تحديث بيانات العميل",
-                user: "فاطمة أحمد",
-                time: "منذ 15 دقيقة",
-                type: "user",
-                status: "محدث",
-              },
-              {
-                action: "تم إضافة منتج جديد للمخزون",
-                user: "محمد علي",
-                time: "منذ 30 دقيقة",
-                type: "product",
-                status: "مضاف",
-              },
-              { action: "تم إنجاز عملية بيع", user: "سارة حسن", time: "منذ ساعة", type: "sale", status: "مكتمل" },
-              { action: "تحديث أسعار المنتجات", user: "خالد أحمد", time: "منذ ساعتين", type: "update", status: "محدث" },
-            ].map((activity, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted/70 transition-colors"
-              >
-                <div className="text-right flex-1">
-                  <p className="text-sm font-medium">{activity.action}</p>
-                  <p className="text-xs text-muted-foreground">بواسطة {activity.user}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-xs">
-                    {activity.status}
-                  </Badge>
-                  <div className="text-xs text-muted-foreground">{activity.time}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

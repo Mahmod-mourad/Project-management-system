@@ -1,8 +1,12 @@
 packages:
   - "."
   - "backend"
+
+# Which dependencies may run install scripts. pnpm blocks them by default, so
+# native modules have to be listed explicitly.
 allowBuilds:
   '@nestjs/core': false
   '@scarf/scarf': false
   bcrypt: true
   sharp: true
+  unrs-resolver: true

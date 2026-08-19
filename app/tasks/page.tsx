@@ -2,13 +2,13 @@
 
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { ProtectedRoute } from "@/components/auth/protected-route"
-import { InventoryManagement } from "@/components/inventory/inventory-management"
+import { TaskBoard } from "@/components/tasks/task-board"
 
-export default function InventoryPage() {
+export default function TasksPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <InventoryManagement />
+        <TaskBoard />
       </DashboardLayout>
     </ProtectedRoute>
   )

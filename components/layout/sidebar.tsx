@@ -3,18 +3,15 @@
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
-  LayoutDashboard,
-  Users,
-  FileText,
-  BarChart3,
-  Settings,
-  Package,
-  CreditCard,
-  UserCheck,
   Building2,
   ChevronLeft,
   ChevronRight,
+  FolderKanban,
+  LayoutDashboard,
+  ListChecks,
+  Settings,
   User,
+  Users,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -24,17 +21,17 @@ interface SidebarProps {
   onToggle: () => void
 }
 
+// Every entry here maps to endpoints the API actually serves. The sidebar used
+// to list inventory, sales, invoices, HR and reports — five modules the backend
+// has never had, each opening a screen built entirely from hardcoded arrays.
 const menuItems = [
-  { icon: LayoutDashboard, label: "لوحة التحكم", href: "/" },
-  { icon: Users, label: "إدارة المستخدمين", href: "/users" },
-  { icon: Building2, label: "إدارة الشركات", href: "/companies" },
-  { icon: Package, label: "إدارة المخزون", href: "/inventory" },
-  { icon: CreditCard, label: "المبيعات", href: "/sales" },
-  { icon: FileText, label: "الفواتير", href: "/invoices" },
-  { icon: BarChart3, label: "التقارير", href: "/reports" },
-  { icon: UserCheck, label: "الموارد البشرية", href: "/hr" },
-  { icon: User, label: "الملف الشخصي", href: "/profile" }, // Added profile menu item
-  { icon: Settings, label: "الإعدادات", href: "/settings" },
+  { icon: LayoutDashboard, label: "Dashboard", href: "/" },
+  { icon: FolderKanban, label: "Projects", href: "/projects" },
+  { icon: ListChecks, label: "Tasks", href: "/tasks" },
+  { icon: Users, label: "Users", href: "/users" },
+  { icon: Building2, label: "Tenants", href: "/admin/tenants" },
+  { icon: User, label: "Profile", href: "/profile" },
+  { icon: Settings, label: "Settings", href: "/settings" },
 ]
 
 export function Sidebar({ isOpen, onToggle }: SidebarProps) {

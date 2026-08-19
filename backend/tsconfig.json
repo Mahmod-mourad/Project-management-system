@@ -6,6 +6,9 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
+    // Without this, `import request from "supertest"` type-checks but compiles to
+    // a namespace object that is not callable at runtime.
+    "esModuleInterop": true,
     "target": "ES2021",
     "sourceMap": true,
     "outDir": "./dist",

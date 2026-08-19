@@ -2,13 +2,13 @@
 
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
 import { ProtectedRoute } from "@/components/auth/protected-route"
-import { ReportsManagement } from "@/components/reports/reports-management"
+import { ProjectsManagement } from "@/components/projects/projects-management"
 
-export default function ReportsPage() {
+export default function ProjectsPage() {
   return (
     <ProtectedRoute>
       <DashboardLayout>
-        <ReportsManagement />
+        <ProjectsManagement />
       </DashboardLayout>
     </ProtectedRoute>
   )

@@ -1,8 +1,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { AlertCircle, RefreshCw, Search } from "lucide-react"
+import { AlertCircle, Plus, RefreshCw, Search } from "lucide-react"
 
+import { useAuth } from "@/components/auth/auth-provider"
 import { useUsers, type User } from "@/hooks/use-users"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -30,7 +31,12 @@ function initials(value: string): string {
 }
 
 export function UserManagement() {
-  const { users, loading, error, fetchUsers, updateUser, deleteUser } = useUsers()
+  const { users, loading, error, fetchUsers, createUser, updateUser, deleteUser } = useUsers()
+  const { user: currentUser } = useAuth()
+
+  // Adding, removing and editing somebody else are administrator actions. The
+  // API enforces that; this just avoids offering buttons that would 403.
+  const isAdmin = currentUser?.role === "admin"
 
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
@@ -66,10 +72,24 @@ export function UserManagement() {
           <p className="text-muted-foreground">Everyone with access to this tenant.</p>
         </div>
 
-        <Button variant="outline" onClick={fetchUsers} disabled={loading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={fetchUsers} disabled={loading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+
+          {isAdmin && (
+            <Button
+              onClick={() => {
+                setSelectedUser(null)
+                setIsDialogOpen(true)
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add user
+            </Button>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -143,19 +163,25 @@ export function UserManagement() {
                       {user.created_at ? new Date(user.created_at).toLocaleDateString() : "—"}
                     </TableCell>
                     <TableCell className="space-x-2 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedUser(user)
-                          setIsDialogOpen(true)
-                        }}
-                      >
-                        Edit
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(user)}>
-                        Remove
-                      </Button>
+                      {(isAdmin || currentUser?.id === user.id) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedUser(user)
+                            setIsDialogOpen(true)
+                          }}
+                        >
+                          Edit
+                        </Button>
+                      )}
+                      {/* An administrator cannot remove their own account, so
+                          the button is not there to be pressed. */}
+                      {isAdmin && currentUser?.id !== user.id && (
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(user)}>
+                          Remove
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -165,16 +191,17 @@ export function UserManagement() {
         </CardContent>
       </Card>
 
-      {/* Accounts are created through registration, not from here — there is no
-          create-user endpoint, and inventing one in the UI would be a button that
-          does nothing. */}
       <UserDialog
         // Remounts when the target changes, so the form re-seeds from props
         // instead of syncing itself in an effect.
         key={selectedUser?.id ?? "new"}
         open={isDialogOpen}
         user={selectedUser}
+        canSetRole={isAdmin}
         onOpenChange={setIsDialogOpen}
+        onCreate={async (values) => {
+          await createUser(values)
+        }}
         onSubmit={async (values) => {
           if (!selectedUser) return
           await updateUser(selectedUser.id, values)

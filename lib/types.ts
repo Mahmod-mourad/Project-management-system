@@ -19,7 +19,7 @@ export interface Project {
   start_date: string | null
   end_date: string | null
   tenant_id: string
-  owner_id: string | null
+  manager_id: string | null
   created_at: string
   updated_at: string
 }
@@ -46,6 +46,8 @@ export interface Task {
   updated_at: string
 }
 
+export type TenantRole = "admin" | "manager" | "member"
+
 export interface User {
   id: string
   email: string
@@ -53,10 +55,26 @@ export interface User {
   avatar_url: string | null
   phone: string | null
   department: string | null
-  role: string
+  role: TenantRole
   tenant_id: string
   created_at: string
   updated_at: string | null
+}
+
+/** What POST /users takes. No tenant_id — the API uses the caller's. */
+export interface CreateUserInput {
+  email: string
+  password: string
+  full_name: string
+  role?: TenantRole
+  phone?: string
+  department?: string
+}
+
+export const TENANT_ROLE_LABELS: Record<TenantRole, string> = {
+  admin: "Admin",
+  manager: "Manager",
+  member: "Member",
 }
 
 export interface CreateProjectInput {
@@ -66,6 +84,7 @@ export interface CreateProjectInput {
   priority?: Priority
   start_date?: string
   end_date?: string
+  manager_id?: string
 }
 
 export interface CreateTaskInput {

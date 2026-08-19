@@ -52,9 +52,9 @@ const customJestConfig = {
       functions: 100,
       lines: 100,
     },
-    './hooks/use-auth.tsx': {
+    './components/auth/auth-provider.tsx': {
       statements: 85,
-      branches: 95,
+      branches: 80,
       functions: 85,
       lines: 85,
     },

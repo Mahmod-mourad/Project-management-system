@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Building2, Plus } from "lucide-react"
 
+import { useAuth } from "@/components/auth/auth-provider"
 import { apiClient } from "@/lib/api-client"
 import {
   TENANT_STATUS_LABELS,
@@ -38,10 +39,22 @@ const STATUS_VARIANTS: Record<TenantStatus, "default" | "destructive" | "seconda
   cancelled: "secondary",
 }
 
+/**
+ * Every tenant on the platform.
+ *
+ * The API restricts all of this to a platform administrator — the flag on the
+ * profile, not a role inside a tenant. The sidebar hides the link for everyone
+ * else, but the route is still typeable, so the screen says so plainly instead
+ * of firing four requests that all answer 403.
+ */
 export default function TenantManagement() {
+  const { user } = useAuth()
+  const isPlatformAdmin = user?.is_platform_admin === true
+
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [stats, setStats] = useState<Record<string, TenantStats>>({})
-  const [loading, setLoading] = useState(true)
+  // Nothing is fetched for a non-administrator, so there is nothing to wait for.
+  const [loading, setLoading] = useState(isPlatformAdmin)
   const [error, setError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -75,6 +88,8 @@ export default function TenantManagement() {
   // it runs, and a cancelled flag stops a slow response writing state after the
   // component has gone.
   useEffect(() => {
+    if (!isPlatformAdmin) return
+
     let cancelled = false
 
     fetchTenants()
@@ -94,7 +109,7 @@ export default function TenantManagement() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [isPlatformAdmin])
 
   /** Reload after a create. Not called during render, so the spinner is fine here. */
   const reload = async () => {
@@ -133,6 +148,25 @@ export default function TenantManagement() {
     } finally {
       setSaving(false)
     }
+  }
+
+  if (!isPlatformAdmin) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Tenants</h1>
+        </div>
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            Managing tenants requires a platform administrator. Your own organisation is on the{" "}
+            <a className="underline" href="/settings">
+              Settings
+            </a>{" "}
+            page.
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   if (loading) {

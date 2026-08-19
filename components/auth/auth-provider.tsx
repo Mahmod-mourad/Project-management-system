@@ -4,25 +4,24 @@ import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
 import { apiClient } from "@/lib/api-client"
 
+import type { TenantRole } from "@/lib/types"
+
 interface User {
   id: string
   email: string
   full_name: string
   tenant_id: string
   avatar_url?: string
-  role?: string
+  phone?: string
+  role?: TenantRole
   department?: string
+  /** Only platform administrators may touch the tenants themselves. */
+  is_platform_admin?: boolean
 }
 
 interface AuthContextType {
   user: User | null
   login: (email: string, password: string) => Promise<void>
-  register: (userData: {
-    email: string
-    password: string
-    full_name: string
-    tenant_id: string
-  }) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
   isLoading: boolean
@@ -84,28 +83,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  const register = async (userData: {
-    email: string
-    password: string
-    full_name: string
-    tenant_id: string
-  }) => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const response = await apiClient.register(userData)
-      apiClient.setAuth(response.access_token, response.user.tenant_id)
-      setUser(response.user)
-      localStorage.setItem("auth-user", JSON.stringify(response.user))
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || err.message || "حدث خطأ في إنشاء الحساب"
-      setError(errorMessage)
-      throw new Error(errorMessage)
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const logout = async () => {
     try {
@@ -153,7 +130,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       value={{
         user,
         login,
-        register,
         logout,
         refreshUser,
         isLoading,

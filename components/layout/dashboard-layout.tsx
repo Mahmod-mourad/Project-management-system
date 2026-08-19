@@ -17,8 +17,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className="min-h-screen bg-background">
       <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
-      <div className={cn("transition-all duration-300", sidebarOpen ? "mr-64" : "mr-16")}>
-        <Header onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
+      <div className={cn("transition-all duration-300", sidebarOpen ? "ml-64" : "ml-16")}>
+        <Header />
         <main className="p-6">{children}</main>
       </div>
     </div>

@@ -12,9 +12,10 @@ every endpoint is backed by a table the setup scripts create.
 | --- | --- |
 | Frontend | `pnpm build` passes — 10 routes, lint and `tsc --noEmit` clean |
 | Backend | `pnpm --filter erp-backend build` passes, lint clean |
-| Unit tests | 105 frontend across 7 suites, 45 backend across 8 |
+| Unit tests | 105 frontend across 7 suites, 46 backend across 8 |
 | Schema | `scripts/` applies cleanly to an empty PostgreSQL, twice over — checked in CI |
-| Integration / E2E | Written; need a running API, so they are not in CI |
+| End to end | Sign-in, projects, tasks, users and the authorization rules exercised against a local Supabase |
+| Integration / E2E suites | Written; need a running API, so they are not in CI |
 | Deployment | None. There is no host, so there is no pipeline pretending to have one |
 
 ## What it does
@@ -70,6 +71,16 @@ export DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
 make db-apply
 ```
 
+PostgREST reads the schema once at startup, so tables created after Supabase is
+already running are invisible to it until you tell it to look again:
+
+```bash
+psql "$DATABASE_URL" -c "NOTIFY pgrst, 'reload schema';"
+```
+
+Without that, every request answers `PGRST205 — could not find the table`, which
+looks exactly like the schema not having been applied.
+
 `04-seed-demo-data.sql` creates a tenant with two accounts, both with the password
 `DemoPassword123!`:
 
@@ -77,6 +88,11 @@ make db-apply
 | --- | --- |
 | `admin@demo.localhost` | tenant administrator, and platform administrator |
 | `member@demo.localhost` | member |
+
+The seeded ids are readable but still valid version 4 UUIDs — the `4` and `a` in
+the middle groups are load-bearing. `11111111-1111-1111-1111-111111111111` is not
+a UUID by RFC 4122; PostgreSQL stores it happily and the API's validators then
+reject it.
 
 There is no sign-up screen, and no public endpoint that creates one — see
 [SECURITY.md](SECURITY.md) for why. A tenant's first administrator comes from SQL; every account

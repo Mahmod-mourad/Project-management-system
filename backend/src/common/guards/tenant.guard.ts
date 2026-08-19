@@ -1,5 +1,5 @@
 import { Injectable, type CanActivate, type ExecutionContext, ForbiddenException, UnauthorizedException } from "@nestjs/common"
-import type { SupabaseService } from "../services/supabase.service"
+import { SupabaseService } from "../services/supabase.service"
 
 /**
  * Resolves the tenant named by the x-tenant-id header and confirms the caller

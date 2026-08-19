@@ -25,6 +25,9 @@ import { SupabaseStrategy } from "./strategies/supabase.strategy"
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, SupabaseStrategy],
-  exports: [AuthService, PassportModule],
+  // JwtModule is exported so the notification gateway can verify the token on a
+  // socket handshake. Registering it a second time there would configure a second
+  // signing secret and let the two disagree.
+  exports: [AuthService, PassportModule, JwtModule],
 })
 export class AuthModule {}

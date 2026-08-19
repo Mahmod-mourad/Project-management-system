@@ -1,7 +1,7 @@
 import { BadRequestException, UnauthorizedException } from "@nestjs/common"
-import type { JwtService } from "@nestjs/jwt"
+import { JwtService } from "@nestjs/jwt"
 
-import type { SupabaseService } from "../supabase/supabase.service"
+import { SupabaseService } from "../supabase/supabase.service"
 import { AuthService } from "./auth.service"
 
 describe("AuthService", () => {

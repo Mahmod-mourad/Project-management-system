@@ -1,7 +1,7 @@
-import { Controller, Get, Post, Patch, Param, Delete, UseGuards, Headers } from "@nestjs/common"
+import { Body, Controller, Get, Post, Patch, Param, Delete, UseGuards, Headers } from "@nestjs/common"
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader } from "@nestjs/swagger"
-import type { ProjectService } from "./project.service"
-import type { CreateProjectDto, UpdateProjectDto } from "./dto/project.dto"
+import { ProjectService } from "./project.service"
+import { CreateProjectDto, UpdateProjectDto } from "./dto/project.dto"
 import { TenantGuard } from "../common/guards/tenant.guard"
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard"
 
@@ -15,7 +15,7 @@ export class ProjectController {
 
   @Post()
   @ApiOperation({ summary: "Create a new project" })
-  create(createProjectDto: CreateProjectDto, @Headers('x-tenant-id') tenantId: string) {
+  create(@Body() createProjectDto: CreateProjectDto, @Headers('x-tenant-id') tenantId: string) {
     return this.projectService.create(tenantId, createProjectDto)
   }
 
@@ -39,7 +39,7 @@ export class ProjectController {
 
   @Patch(":id")
   @ApiOperation({ summary: "Update project" })
-  update(@Param('id') id: string, updateProjectDto: UpdateProjectDto, @Headers('x-tenant-id') tenantId: string) {
+  update(@Param('id') id: string, @Body() updateProjectDto: UpdateProjectDto, @Headers('x-tenant-id') tenantId: string) {
     return this.projectService.update(tenantId, id, updateProjectDto)
   }
 

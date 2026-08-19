@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common"
 import { PassportStrategy } from "@nestjs/passport"
 import { Strategy } from "passport-custom"
-import type { SupabaseService } from "../../supabase/supabase.service"
+import { SupabaseService } from "../../supabase/supabase.service"
 
 @Injectable()
 export class SupabaseStrategy extends PassportStrategy(Strategy, "supabase") {

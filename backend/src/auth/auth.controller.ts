@@ -1,7 +1,7 @@
-import { Controller, Post, UseGuards, Get, Request } from "@nestjs/common"
+import { Body, Controller, Post, UseGuards, Get, Request } from "@nestjs/common"
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger"
-import type { AuthService } from "./auth.service"
-import type { LoginDto, RegisterDto } from "./dto/auth.dto"
+import { AuthService } from "./auth.service"
+import { LoginDto, RegisterDto } from "./dto/auth.dto"
 import { JwtAuthGuard } from "./guards/jwt-auth.guard"
 
 interface AuthenticatedRequest {
@@ -18,13 +18,13 @@ export class AuthController {
 
   @Post("register")
   @ApiOperation({ summary: "Register a new user" })
-  register(registerDto: RegisterDto) {
+  register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto)
   }
 
   @Post("login")
   @ApiOperation({ summary: "Login user" })
-  login(loginDto: LoginDto) {
+  login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto)
   }
 

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common"
-import type { SupabaseService } from "../supabase/supabase.service"
-import type { UpdateUserDto } from "./dto/user.dto"
+import { SupabaseService } from "../supabase/supabase.service"
+import { UpdateUserDto } from "./dto/user.dto"
 
 @Injectable()
 export class UserService {

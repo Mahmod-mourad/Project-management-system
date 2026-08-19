@@ -65,8 +65,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     try {
       const response = await apiClient.login(email, password)
-      // BUG #2: Direct HTML rendering of error message without sanitization
-      // BUG #5: Missing null check for response.user
+
+      // A malformed response used to blow up on response.user.tenant_id with a
+      // TypeError, which surfaced as a generic failure rather than a clear one.
+      if (!response?.access_token || !response.user?.tenant_id) {
+        throw new Error("The server returned an unexpected sign-in response")
+      }
+
       apiClient.setAuth(response.access_token, response.user.tenant_id)
       setUser(response.user)
       localStorage.setItem("auth-user", JSON.stringify(response.user))

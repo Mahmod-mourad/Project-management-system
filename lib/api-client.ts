@@ -32,15 +32,31 @@ class ApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       (error) => {
-        // BUG #9: Only handles 401, ignores 403, 500 and other errors
-        if (error.response?.status === 401) {
+        const status = error.response?.status
+
+        // 401 means the token is gone or expired: drop it and start over.
+        // 403 means the token is fine but this account may not do this — keeping
+        // the session and letting the caller show the message is the right move.
+        if (status === 401) {
           this.clearAuth()
-          // Redirect to login if needed
           if (typeof window !== "undefined") {
-            window.location.href = "/auth/login"
+            window.location.href = "/login"
           }
         }
-        return Promise.reject(error)
+
+        // Normalise what callers catch. Axios errors carry the useful text three
+        // levels deep, so every call site was digging it out for itself.
+        const message =
+          error.response?.data?.message ||
+          error.message ||
+          "The request failed. Please try again."
+
+        return Promise.reject(
+          Object.assign(new Error(Array.isArray(message) ? message.join(", ") : message), {
+            status,
+            cause: error,
+          }),
+        )
       },
     )
   }

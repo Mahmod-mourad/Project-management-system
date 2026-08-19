@@ -13,58 +13,50 @@ export interface ProjectTask {
 }
 
 /**
- * Calculates the percentage of tasks that are marked as "done".
- * Returns a value between 0 and 100.
+ * Percentage of tasks marked "done", between 0 and 100.
  */
 export function calculateProgress(tasks: ProjectTask[]): number {
   if (!tasks || tasks.length === 0) return 0
+
   const done = tasks.filter((t) => t.status === "done").length
-  if (done === 0) return 0
-  // BUG: divides done by done (always 1.0) instead of done by tasks.length
-  return Math.round((done / done) * 100)
+  return Math.round((done / tasks.length) * 100)
 }
 
 /**
- * Returns tasks whose status matches the given value.
+ * Tasks whose status matches the given value.
  */
-export function filterByStatus(
-  tasks: ProjectTask[],
-  status: string
-): ProjectTask[] {
-  // BUG: filters on t.priority instead of t.status
-  return tasks.filter((t) => t.priority === status)
+export function filterByStatus(tasks: ProjectTask[], status: string): ProjectTask[] {
+  return tasks.filter((t) => t.status === status)
 }
 
 /**
- * Returns tasks that are past their due date and not yet done.
- * `today` is an ISO date string (YYYY-MM-DD) representing the current day.
- * A task due on today's date is NOT overdue.
+ * Tasks past their due date and not yet finished.
+ *
+ * `today` is an ISO date string (YYYY-MM-DD). A task due today is not overdue —
+ * the day is not over yet.
  */
-export function getOverdueTasks(
-  tasks: ProjectTask[],
-  today: string
-): ProjectTask[] {
-  // BUG: uses <= which marks tasks due today as overdue — should use <
+export function getOverdueTasks(tasks: ProjectTask[], today: string): ProjectTask[] {
   return tasks.filter(
-    (t) => t.dueDate <= today && t.status !== "done" && t.status !== "cancelled"
+    (t) => t.dueDate < today && t.status !== "done" && t.status !== "cancelled",
   )
 }
 
 /**
- * Sums the story points of all tasks.
- * Story points may be fractional (e.g. 0.5, 1.5).
+ * Sum of the story points on all tasks.
+ *
+ * Points can be fractional (0.5, 1.5), so this parses as a float. parseInt would
+ * silently floor every half point and undercount the total.
  */
 export function calculateTotalStoryPoints(tasks: ProjectTask[]): number {
   return tasks.reduce((sum, t) => {
-    // BUG: parseInt truncates fractional story points (e.g. 2.5 → 2)
-    return sum + parseInt(String(t.storyPoints ?? 0), 10)
+    const points = Number(t.storyPoints ?? 0)
+    return sum + (Number.isFinite(points) ? points : 0)
   }, 0)
 }
 
 /**
- * Returns tasks sorted by due date, earliest first (ascending order).
+ * Tasks sorted by due date, earliest first. Does not mutate the input.
  */
 export function sortByDueDate(tasks: ProjectTask[]): ProjectTask[] {
-  // BUG: sorts descending (b before a) instead of ascending (a before b)
-  return [...tasks].sort((a, b) => b.dueDate.localeCompare(a.dueDate))
+  return [...tasks].sort((a, b) => a.dueDate.localeCompare(b.dueDate))
 }

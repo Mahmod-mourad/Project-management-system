@@ -18,7 +18,13 @@ CREATE TABLE IF NOT EXISTS auth.users (
   raw_app_meta_data JSONB,
   raw_user_meta_data JSONB,
   created_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ
+  updated_at TIMESTAMPTZ,
+  -- The four the seed writes as ''. GoTrue scans them into plain Go strings, so
+  -- leaving them NULL breaks every sign-in; see the note in the seed.
+  confirmation_token VARCHAR(255),
+  recovery_token VARCHAR(255),
+  email_change VARCHAR(255),
+  email_change_token_new VARCHAR(255)
 );
 CREATE TABLE IF NOT EXISTS auth.identities (
   id UUID,

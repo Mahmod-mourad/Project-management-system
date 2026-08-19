@@ -1,10 +1,10 @@
 import { Controller, Get, Patch, Param, Delete, Body, UseGuards, Req } from "@nestjs/common"
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader } from "@nestjs/swagger"
-import type { UserService } from "./user.service"
-import type { UpdateUserDto } from "./dto/user.dto"
+import { UserService } from "./user.service"
+import { UpdateUserDto } from "./dto/user.dto"
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard"
 import { TenantGuard } from "../common/guards/tenant.guard"
-import type { Request } from "express"
+import { Request } from "express"
 
 @ApiTags("users")
 @ApiBearerAuth()

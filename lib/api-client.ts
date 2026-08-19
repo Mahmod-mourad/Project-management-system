@@ -1,5 +1,17 @@
 import axios, { type AxiosInstance } from "axios"
 
+import type {
+  CreateProjectInput,
+  CreateTenantInput,
+  CreateTaskInput,
+  Project,
+  ProjectStats,
+  Task,
+  Tenant,
+  TenantStats,
+  User,
+} from "./types"
+
 class ApiClient {
   private client: AxiosInstance
   private token: string | null = null
@@ -32,15 +44,31 @@ class ApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       (error) => {
-        // BUG #9: Only handles 401, ignores 403, 500 and other errors
-        if (error.response?.status === 401) {
+        const status = error.response?.status
+
+        // 401 means the token is gone or expired: drop it and start over.
+        // 403 means the token is fine but this account may not do this — keeping
+        // the session and letting the caller show the message is the right move.
+        if (status === 401) {
           this.clearAuth()
-          // Redirect to login if needed
           if (typeof window !== "undefined") {
-            window.location.href = "/auth/login"
+            window.location.href = "/login"
           }
         }
-        return Promise.reject(error)
+
+        // Normalise what callers catch. Axios errors carry the useful text three
+        // levels deep, so every call site was digging it out for itself.
+        const message =
+          error.response?.data?.message ||
+          error.message ||
+          "The request failed. Please try again."
+
+        return Promise.reject(
+          Object.assign(new Error(Array.isArray(message) ? message.join(", ") : message), {
+            status,
+            cause: error,
+          }),
+        )
       },
     )
   }
@@ -108,39 +136,65 @@ class ApiClient {
     return response.data
   }
 
+  // Notification endpoints
+  async getNotifications() {
+    const response = await this.client.get("/notifications")
+    return response.data
+  }
+
+  async markNotificationRead(id: string) {
+    const response = await this.client.patch(`/notifications/${id}/read`)
+    return response.data
+  }
+
+  async markAllNotificationsRead() {
+    const response = await this.client.post("/notifications/mark-all-read")
+    return response.data
+  }
+
   // Tenant endpoints
-  async getTenants() {
+  async getTenants(): Promise<Tenant[]> {
     const response = await this.client.get("/tenants")
     return response.data
   }
 
-  async getTenant(id: string) {
+  async getTenant(id: string): Promise<Tenant> {
     const response = await this.client.get(`/tenants/${id}`)
     return response.data
   }
 
-  async getTenantStats(id: string) {
+  async createTenant(input: CreateTenantInput): Promise<Tenant> {
+    const response = await this.client.post("/tenants", input)
+    return response.data
+  }
+
+  async updateTenant(id: string, input: Partial<CreateTenantInput>): Promise<Tenant> {
+    const response = await this.client.patch(`/tenants/${id}`, input)
+    return response.data
+  }
+
+  async getTenantStats(id: string): Promise<TenantStats> {
     const response = await this.client.get(`/tenants/${id}/stats`)
     return response.data
   }
 
   // Project endpoints
-  async getProjects() {
+  async getProjects(): Promise<Project[]> {
     const response = await this.client.get("/projects")
     return response.data
   }
 
-  async getProject(id: string) {
+  async getProject(id: string): Promise<Project> {
     const response = await this.client.get(`/projects/${id}`)
     return response.data
   }
 
-  async createProject(projectData: any) {
+  async createProject(projectData: CreateProjectInput): Promise<Project> {
     const response = await this.client.post("/projects", projectData)
     return response.data
   }
 
-  async updateProject(id: string, projectData: any) {
+  async updateProject(id: string, projectData: Partial<CreateProjectInput>): Promise<Project> {
     const response = await this.client.patch(`/projects/${id}`, projectData)
     return response.data
   }
@@ -150,29 +204,29 @@ class ApiClient {
     return response.data
   }
 
-  async getProjectStats(id: string) {
+  async getProjectStats(id: string): Promise<ProjectStats> {
     const response = await this.client.get(`/projects/${id}/stats`)
     return response.data
   }
 
   // Task endpoints
-  async getTasks(projectId?: string) {
+  async getTasks(projectId?: string): Promise<Task[]> {
     const params = projectId ? { project_id: projectId } : {}
     const response = await this.client.get("/tasks", { params })
     return response.data
   }
 
-  async getTask(id: string) {
+  async getTask(id: string): Promise<Task> {
     const response = await this.client.get(`/tasks/${id}`)
     return response.data
   }
 
-  async createTask(taskData: any) {
+  async createTask(taskData: CreateTaskInput): Promise<Task> {
     const response = await this.client.post("/tasks", taskData)
     return response.data
   }
 
-  async updateTask(id: string, taskData: any) {
+  async updateTask(id: string, taskData: Partial<CreateTaskInput>): Promise<Task> {
     const response = await this.client.patch(`/tasks/${id}`, taskData)
     return response.data
   }
@@ -188,7 +242,7 @@ class ApiClient {
   }
 
   // User endpoints
-  async getUsers() {
+  async getUsers(): Promise<User[]> {
     const response = await this.client.get("/users")
     return response.data
   }

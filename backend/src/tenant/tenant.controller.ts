@@ -1,7 +1,7 @@
-import { Controller, Get, Post, Patch, Param, Delete, UseGuards } from "@nestjs/common"
+import { Body, Controller, Get, Post, Patch, Param, Delete, UseGuards } from "@nestjs/common"
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger"
-import type { TenantService } from "./tenant.service"
-import type { CreateTenantDto, UpdateTenantDto } from "./dto/tenant.dto"
+import { TenantService } from "./tenant.service"
+import { CreateTenantDto, UpdateTenantDto } from "./dto/tenant.dto"
 import { TenantGuard } from "../common/guards/tenant.guard"
 
 @ApiTags("tenants")
@@ -12,7 +12,7 @@ export class TenantController {
 
   @Post()
   @ApiOperation({ summary: "Create a new tenant" })
-  create(createTenantDto: CreateTenantDto) {
+  create(@Body() createTenantDto: CreateTenantDto) {
     return this.tenantService.create(createTenantDto)
   }
 
@@ -37,7 +37,7 @@ export class TenantController {
 
   @Patch(":id")
   @ApiOperation({ summary: "Update tenant" })
-  update(@Param('id') id: string, updateTenantDto: UpdateTenantDto) {
+  update(@Param('id') id: string, @Body() updateTenantDto: UpdateTenantDto) {
     return this.tenantService.update(id, updateTenantDto)
   }
 

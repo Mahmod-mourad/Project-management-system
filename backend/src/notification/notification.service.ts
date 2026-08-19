@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common"
-import type { SupabaseService } from "../supabase/supabase.service"
-import type { NotificationGateway } from "./notification.gateway"
+import { SupabaseService } from "../supabase/supabase.service"
+import { NotificationGateway } from "./notification.gateway"
 
 export interface Notification {
   id: string

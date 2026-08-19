@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common"
-import type { SupabaseService } from "../supabase/supabase.service"
-import type { CreateTenantDto, UpdateTenantDto } from "./dto/tenant.dto"
+import { SupabaseService } from "../supabase/supabase.service"
+import { CreateTenantDto, UpdateTenantDto } from "./dto/tenant.dto"
 
 @Injectable()
 export class TenantService {
@@ -49,20 +49,23 @@ export class TenantService {
     return { message: "Tenant deleted successfully" }
   }
 
+  /**
+   * Row counts for one tenant.
+   *
+   * This also counted `inventory_items`, a table with no module, no endpoint and
+   * no screen behind it — the count was returned to a UI that never displayed it.
+   */
   async getTenantStats(tenantId: string) {
-    // Get comprehensive tenant statistics
-    const [users, projects, tasks, inventory] = await Promise.all([
+    const [users, projects, tasks] = await Promise.all([
       this.supabaseService.client.from("profiles").select("id", { count: "exact" }).eq("tenant_id", tenantId),
       this.supabaseService.client.from("projects").select("id", { count: "exact" }).eq("tenant_id", tenantId),
       this.supabaseService.client.from("tasks").select("id", { count: "exact" }).eq("tenant_id", tenantId),
-      this.supabaseService.client.from("inventory_items").select("id", { count: "exact" }).eq("tenant_id", tenantId),
     ])
 
     return {
       users: users.count || 0,
       projects: projects.count || 0,
       tasks: tasks.count || 0,
-      inventory: inventory.count || 0,
     }
   }
 }

@@ -1,302 +1,184 @@
 "use client"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
+import { useMemo, useState } from "react"
+import { AlertCircle, RefreshCw, Search } from "lucide-react"
+
+import { useUsers, type User } from "@/hooks/use-users"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Search, Plus, MoreHorizontal, Edit, Trash2, UserCheck, UserX } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { UserDialog } from "./user-dialog"
 
-interface User {
-  id: string
-  name: string
-  email: string
-  role: string
-  status: "active" | "inactive"
-  department: string
-  joinDate: string
-  avatar?: string
+/** Falls back to the email when a profile has no name yet. */
+function displayName(user: User): string {
+  return user.full_name?.trim() || user.email
 }
 
-const mockUsers: User[] = [
-  {
-    id: "1",
-    name: "أحمد محمد",
-    email: "ahmed@company.com",
-    role: "مدير النظام",
-    status: "active",
-    department: "تقنية المعلومات",
-    joinDate: "2023-01-15",
-    avatar: "/placeholder.svg?height=32&width=32",
-  },
-  {
-    id: "2",
-    name: "فاطمة أحمد",
-    email: "fatima@company.com",
-    role: "مدير المبيعات",
-    status: "active",
-    department: "المبيعات",
-    joinDate: "2023-02-20",
-    avatar: "/placeholder.svg?height=32&width=32",
-  },
-  {
-    id: "3",
-    name: "محمد علي",
-    email: "mohamed@company.com",
-    role: "محاسب",
-    status: "active",
-    department: "المحاسبة",
-    joinDate: "2023-03-10",
-    avatar: "/placeholder.svg?height=32&width=32",
-  },
-  {
-    id: "4",
-    name: "سارة حسن",
-    email: "sara@company.com",
-    role: "موظف مبيعات",
-    status: "inactive",
-    department: "المبيعات",
-    joinDate: "2023-04-05",
-    avatar: "/placeholder.svg?height=32&width=32",
-  },
-  {
-    id: "5",
-    name: "عمر خالد",
-    email: "omar@company.com",
-    role: "مطور",
-    status: "active",
-    department: "تقنية المعلومات",
-    joinDate: "2023-05-12",
-    avatar: "/placeholder.svg?height=32&width=32",
-  },
-]
+function initials(value: string): string {
+  return value
+    .split(/[\s@.]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase()
+}
 
 export function UserManagement() {
-  const [users, setUsers] = useState<User[]>(mockUsers)
+  const { users, loading, error, fetchUsers, updateUser, deleteUser } = useUsers()
+
   const [searchTerm, setSearchTerm] = useState("")
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.department.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  const filtered = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase()
+    if (term === "") return users
 
-  const handleAddUser = () => {
-    setSelectedUser(null)
-    setIsDialogOpen(true)
-  }
-
-  const handleEditUser = (user: User) => {
-    setSelectedUser(user)
-    setIsDialogOpen(true)
-  }
-
-  const handleDeleteUser = (userId: string) => {
-    setUsers(users.filter((user) => user.id !== userId))
-  }
-
-  const handleToggleStatus = (userId: string) => {
-    setUsers(
-      users.map((user) =>
-        user.id === userId ? { ...user, status: user.status === "active" ? "inactive" : "active" } : user,
-      ),
+    return users.filter(
+      (user) =>
+        displayName(user).toLowerCase().includes(term) ||
+        user.email.toLowerCase().includes(term) ||
+        (user.department ?? "").toLowerCase().includes(term),
     )
-  }
+  }, [users, searchTerm])
 
-  const handleSaveUser = (userData: Omit<User, "id">) => {
-    if (selectedUser) {
-      // Edit existing user
-      setUsers(users.map((user) => (user.id === selectedUser.id ? { ...userData, id: selectedUser.id } : user)))
-    } else {
-      // Add new user
-      const newUser: User = {
-        ...userData,
-        id: Date.now().toString(),
-      }
-      setUsers([...users, newUser])
+  const handleDelete = async (user: User) => {
+    if (!confirm(`Remove ${displayName(user)} from this tenant?`)) return
+
+    try {
+      await deleteUser(user.id)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not remove the user")
     }
-    setIsDialogOpen(false)
   }
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div className="text-right">
-          <h1 className="text-3xl font-bold text-foreground">إدارة المستخدمين</h1>
-          <p className="text-muted-foreground mt-2">إدارة حسابات المستخدمين وصلاحياتهم</p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Users</h1>
+          <p className="text-muted-foreground">Everyone with access to this tenant.</p>
         </div>
-        <Button onClick={handleAddUser} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          إضافة مستخدم جديد
+
+        <Button variant="outline" onClick={fetchUsers} disabled={loading}>
+          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          Refresh
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-right">إجمالي المستخدمين</CardTitle>
-            <UserCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-right">{users.length}</div>
-          </CardContent>
-        </Card>
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-right">المستخدمين النشطين</CardTitle>
-            <UserCheck className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-right">
-              {users.filter((user) => user.status === "active").length}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-right">المستخدمين غير النشطين</CardTitle>
-            <UserX className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-right">
-              {users.filter((user) => user.status === "inactive").length}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-right">الأقسام</CardTitle>
-            <UserCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-right">{new Set(users.map((user) => user.department)).size}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Users Table */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-right">قائمة المستخدمين</CardTitle>
-            <div className="relative w-72">
-              <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="البحث عن المستخدمين..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pr-10 text-right"
-              />
-            </div>
+        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-4">
+          <CardTitle>
+            {filtered.length} {filtered.length === 1 ? "user" : "users"}
+          </CardTitle>
+
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, email or department"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              className="pl-9"
+            />
           </div>
-          <CardDescription className="text-right">إدارة وعرض جميع المستخدمين في النظام</CardDescription>
         </CardHeader>
+
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="text-right">المستخدم</TableHead>
-                <TableHead className="text-right">البريد الإلكتروني</TableHead>
-                <TableHead className="text-right">الدور</TableHead>
-                <TableHead className="text-right">القسم</TableHead>
-                <TableHead className="text-right">الحالة</TableHead>
-                <TableHead className="text-right">تاريخ الانضمام</TableHead>
-                <TableHead className="text-right">الإجراءات</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="text-right">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
-                        <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium">{user.name}</div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">{user.email}</TableCell>
-                  <TableCell className="text-right">{user.role}</TableCell>
-                  <TableCell className="text-right">{user.department}</TableCell>
-                  <TableCell className="text-right">
-                    <Badge variant={user.status === "active" ? "default" : "secondary"}>
-                      {user.status === "active" ? "نشط" : "غير نشط"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">{new Date(user.joinDate).toLocaleDateString("ar-SA")}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel className="text-right">الإجراءات</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-right" onClick={() => handleEditUser(user)}>
-                          <Edit className="ml-2 h-4 w-4" />
-                          تعديل
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-right" onClick={() => handleToggleStatus(user.id)}>
-                          {user.status === "active" ? (
-                            <>
-                              <UserX className="ml-2 h-4 w-4" />
-                              إلغاء التفعيل
-                            </>
-                          ) : (
-                            <>
-                              <UserCheck className="ml-2 h-4 w-4" />
-                              تفعيل
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-right text-destructive"
-                          onClick={() => handleDeleteUser(user.id)}
-                        >
-                          <Trash2 className="ml-2 h-4 w-4" />
-                          حذف
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+          {loading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <p className="py-12 text-center text-muted-foreground">
+              {users.length === 0 ? "No users in this tenant yet." : "Nobody matches that search."}
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Joined</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-9 w-9">
+                          <AvatarImage src={user.avatar_url ?? undefined} alt="" />
+                          <AvatarFallback>{initials(displayName(user))}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{displayName(user)}</p>
+                          <p className="truncate text-sm text-muted-foreground">{user.email}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={user.role === "admin" ? "default" : "secondary"}>
+                        {user.role}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{user.department || "—"}</TableCell>
+                    <TableCell>
+                      {user.created_at ? new Date(user.created_at).toLocaleDateString() : "—"}
+                    </TableCell>
+                    <TableCell className="space-x-2 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedUser(user)
+                          setIsDialogOpen(true)
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(user)}>
+                        Remove
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
-      {/* User Dialog */}
+      {/* Accounts are created through registration, not from here — there is no
+          create-user endpoint, and inventing one in the UI would be a button that
+          does nothing. */}
       <UserDialog
-        isOpen={isDialogOpen}
-        onClose={() => setIsDialogOpen(false)}
-        onSave={handleSaveUser}
+        // Remounts when the target changes, so the form re-seeds from props
+        // instead of syncing itself in an effect.
+        key={selectedUser?.id ?? "new"}
+        open={isDialogOpen}
         user={selectedUser}
+        onOpenChange={setIsDialogOpen}
+        onSubmit={async (values) => {
+          if (!selectedUser) return
+          await updateUser(selectedUser.id, values)
+        }}
       />
     </div>
   )

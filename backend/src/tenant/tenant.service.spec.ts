@@ -1,6 +1,6 @@
 import { NotFoundException } from "@nestjs/common"
 
-import type { SupabaseService } from "../supabase/supabase.service"
+import { SupabaseService } from "../supabase/supabase.service"
 import { TenantService } from "./tenant.service"
 
 describe("TenantService", () => {

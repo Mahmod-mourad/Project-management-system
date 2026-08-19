@@ -4,8 +4,8 @@ import {
   type OnGatewayConnection,
   type OnGatewayDisconnect,
 } from "@nestjs/websockets"
-import type { Server, Socket } from "socket.io"
-import type { JwtService } from "@nestjs/jwt"
+import { Server, Socket } from "socket.io"
+import { JwtService } from "@nestjs/jwt"
 import { Logger } from "@nestjs/common"
 
 @WebSocketGateway({

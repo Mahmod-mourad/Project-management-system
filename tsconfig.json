@@ -36,6 +36,10 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    // The NestJS app has its own tsconfig with experimentalDecorators and its own
+    // strictness settings. Type-checking it with the Next config reported errors
+    // on every controller decorator.
+    "backend"
   ]
 }

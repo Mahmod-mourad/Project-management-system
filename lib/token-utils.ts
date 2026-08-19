@@ -4,50 +4,59 @@
  */
 
 /**
- * Decodes the payload section of a JWT without verifying the signature.
- * Returns null if the token is missing or the payload cannot be decoded.
+ * Decodes the payload of a JWT without verifying the signature.
+ *
+ * Signature verification happens on the API. This is only for reading claims the
+ * UI needs — never for deciding whether a request is allowed.
+ *
+ * Returns null for anything that is not a decodable token, rather than throwing:
+ * a malformed token in storage should sign the user out, not crash the page that
+ * read it.
  */
 export function parseJwtPayload(token: string): Record<string, unknown> | null {
   if (!token || typeof token !== "string") return null
+
   const parts = token.split(".")
   if (parts.length !== 3) return null
-  // BUG: no try/catch — throws on malformed base64 or invalid JSON instead of returning null
-  const base64 = (parts[1] as string).replace(/-/g, "+").replace(/_/g, "/")
-  const decoded = atob(base64)
-  return JSON.parse(decoded)
+
+  try {
+    const base64 = (parts[1] as string).replace(/-/g, "+").replace(/_/g, "/")
+    return JSON.parse(atob(base64))
+  } catch {
+    return null
+  }
 }
 
 /**
- * Returns true if the token's `exp` claim is in the past.
- * `expiresAt` is a Unix timestamp in seconds.
- * `nowSeconds` defaults to the current time; injectable for testing.
+ * True when the token's `exp` claim has passed.
+ *
+ * `expiresAt` is a Unix timestamp in seconds. A token whose exp equals the
+ * current second has expired — `exp` is the moment it stops being valid, not the
+ * last moment it is.
  */
 export function isTokenExpired(
   expiresAt: number,
-  nowSeconds: number = Math.floor(Date.now() / 1000)
+  nowSeconds: number = Math.floor(Date.now() / 1000),
 ): boolean {
-  // BUG: uses strict less-than (<) instead of (<=)
-  // A token whose exp equals the current second is treated as still valid
-  return expiresAt < nowSeconds
+  return expiresAt <= nowSeconds
 }
 
 /**
- * Returns the number of seconds remaining until the token expires.
- * Should return 0 for already-expired tokens, never a negative value.
+ * Seconds remaining before the token expires, floored at zero.
+ *
+ * Callers use this to schedule a refresh; a negative value would schedule one in
+ * the past.
  */
 export function getTokenRemainingSeconds(
   expiresAt: number,
-  nowSeconds: number = Math.floor(Date.now() / 1000)
+  nowSeconds: number = Math.floor(Date.now() / 1000),
 ): number {
-  // BUG: can return negative values for expired tokens — should clamp at 0
-  return expiresAt - nowSeconds
+  return Math.max(expiresAt - nowSeconds, 0)
 }
 
 /**
- * Builds the Authorization header value for an API request.
- * Returns a string in the form "Bearer <token>".
+ * The Authorization header value for an API request.
  */
 export function buildAuthHeader(token: string): string {
-  // BUG: double space between "Bearer" and the token
-  return `Bearer  ${token}`
+  return `Bearer ${token}`
 }

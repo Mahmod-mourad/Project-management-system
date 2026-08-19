@@ -1,7 +1,7 @@
-import { Injectable, UnauthorizedException, BadRequestException } from "@nestjs/common"
+import { Injectable, UnauthorizedException } from "@nestjs/common"
 import { JwtService } from "@nestjs/jwt"
 import { SupabaseService } from "../supabase/supabase.service"
-import { LoginDto, RegisterDto } from "./dto/auth.dto"
+import { LoginDto } from "./dto/auth.dto"
 
 @Injectable()
 export class AuthService {
@@ -10,59 +10,6 @@ export class AuthService {
     private supabaseService: SupabaseService,
   ) {}
 
-  async register(registerDto: RegisterDto) {
-    const { email, password, full_name, tenant_id } = registerDto
-
-    // Create user in Supabase Auth
-    const { data: authData, error: authError } = await this.supabaseService.client.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        full_name,
-        tenant_id,
-      },
-    })
-
-    if (authError) {
-      throw new BadRequestException(authError.message)
-    }
-
-    // Create user profile
-    const { data: profile, error: profileError } = await this.supabaseService.client
-      .from("profiles")
-      .insert({
-        id: authData.user.id,
-        email,
-        full_name,
-        tenant_id,
-      })
-      .select()
-      .single()
-
-    if (profileError) {
-      // Cleanup auth user if profile creation fails
-      await this.supabaseService.client.auth.admin.deleteUser(authData.user.id)
-      throw new BadRequestException("Failed to create user profile")
-    }
-
-    // Generate JWT token
-    const payload = {
-      sub: authData.user.id,
-      email: authData.user.email,
-      tenant_id,
-    }
-
-    return {
-      access_token: this.jwtService.sign(payload),
-      user: {
-        id: authData.user.id,
-        email: authData.user.email,
-        full_name,
-        tenant_id,
-      },
-    }
-  }
 
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto
@@ -102,6 +49,11 @@ export class AuthService {
         email: authData.user.email,
         full_name: profile.full_name,
         tenant_id: profile.tenant_id,
+        // The UI hides administrator-only actions on these two. Sending them
+        // saves the client a second round trip just to draw its own menu; the
+        // API still checks both itself on every request.
+        role: profile.role,
+        is_platform_admin: profile.is_platform_admin ?? false,
       },
     }
   }

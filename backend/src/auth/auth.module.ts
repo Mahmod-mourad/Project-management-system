@@ -7,7 +7,6 @@ import { SupabaseModule } from "../supabase/supabase.module"
 import { AuthController } from "./auth.controller"
 import { AuthService } from "./auth.service"
 import { JwtStrategy } from "./strategies/jwt.strategy"
-import { SupabaseStrategy } from "./strategies/supabase.strategy"
 
 @Module({
   imports: [
@@ -24,7 +23,10 @@ import { SupabaseStrategy } from "./strategies/supabase.strategy"
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, SupabaseStrategy],
+  // SupabaseStrategy was registered here too: a second authentication path,
+  // verifying tokens against Supabase directly, that no guard ever selected.
+  // Nothing in the app could reach it.
+  providers: [AuthService, JwtStrategy],
   // JwtModule is exported so the notification gateway can verify the token on a
   // socket handshake. Registering it a second time there would configure a second
   // signing secret and let the two disagree.

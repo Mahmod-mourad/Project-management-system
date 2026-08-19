@@ -1,6 +1,6 @@
 import { Test } from "@nestjs/testing"
 import { INestApplication, ValidationPipe } from "@nestjs/common"
-import { PATH_METADATA, METHOD_METADATA, ROUTE_ARGS_METADATA } from "@nestjs/common/constants"
+import { METHOD_METADATA, ROUTE_ARGS_METADATA } from "@nestjs/common/constants"
 import { RouteParamtypes } from "@nestjs/common/enums/route-paramtypes.enum"
 import request from "supertest"
 

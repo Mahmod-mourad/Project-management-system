@@ -120,18 +120,22 @@ describe('ApiClient', () => {
       expect(result.access_token).toBe('jwt')
     })
 
-    it('posts the full payload to /auth/register', async () => {
-      mockInstance.post.mockResolvedValueOnce({ data: { user: { id: '1' } } })
+    // register() used to post to the public /auth/register with a tenant_id the
+    // caller picked. Adding a user is now an administrator action inside the
+    // caller's own tenant, so there is no tenant in the payload at all.
+    it('creates a user through /users with no tenant in the body', async () => {
+      mockInstance.post.mockResolvedValueOnce({ data: { id: '1' } })
       const payload = {
         email: 'user@example.com',
-        password: 'secret',
+        password: 'SecurePassword123',
         full_name: 'Test User',
-        tenant_id: 'tenant-1',
+        role: 'member' as const,
       }
 
-      await apiClient.register(payload)
+      const result = await apiClient.createUser(payload)
 
-      expect(mockInstance.post).toHaveBeenCalledWith('/auth/register', payload)
+      expect(mockInstance.post).toHaveBeenCalledWith('/users', payload)
+      expect(result).toEqual({ id: '1' })
     })
 
     it('clears stored credentials after logging out', async () => {

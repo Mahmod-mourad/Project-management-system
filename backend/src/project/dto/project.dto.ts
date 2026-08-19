@@ -54,7 +54,10 @@ export class CreateProjectDto {
   @ApiProperty({ required: false, type: [String] })
   @IsOptional()
   @IsArray()
-  @IsUUID("4", { each: true })
+  // "all", matching manager_id and every other id field on these DTOs. This one
+  // alone demanded version 4, so an id every other endpoint accepted was
+  // rejected here.
+  @IsUUID("all", { each: true })
   team_member_ids?: string[]
 }
 

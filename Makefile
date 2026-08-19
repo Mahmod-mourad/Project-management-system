@@ -1,176 +1,64 @@
-.PHONY: help install dev build test lint docker-build docker-up docker-down docker-logs clean deploy
+.PHONY: help install dev dev-backend dev-frontend build test lint typecheck db-apply docker-build docker-up docker-down docker-logs clean
 
-# Variables
-PROJECT_NAME=erp-system
-DOCKER_COMPOSE=docker-compose
-DOCKER_COMPOSE_PROD=docker-compose -f docker-compose.prod.yml
+# Everything here runs a command that exists.
+#
+# The previous version drove the whole project with npm in a pnpm workspace,
+# opened shells into a PostgreSQL and a Redis container that nothing connected
+# to, seeded from SQL files that could not run, called a migration:run script
+# that is not in either package.json, and health-checked a /health endpoint the
+# API does not serve.
 
-# Colors
-YELLOW=\033[0;33m
-GREEN=\033[0;32m
-NC=\033[0m # No Color
+PNPM=pnpm
 
-help: ## Show this help message
-	@echo "$(YELLOW)$(PROJECT_NAME) - Available Commands$(NC)"
-	@echo "==================================="
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-20s$(NC) %s\n", $$1, $$2}'
-	@echo ""
+help: ## Show this help
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-16s %s\n", $$1, $$2}'
 
-# Development Commands
-install: ## Install dependencies
-	npm install
-	cd backend && npm install && cd ..
-	@echo "$(GREEN)✓ Dependencies installed$(NC)"
+install: ## Install every workspace dependency
+	$(PNPM) install
 
-dev: ## Start development servers
-	@echo "$(YELLOW)Starting development environment...$(NC)"
+dev: ## Start the frontend (http://localhost:3000)
+	$(PNPM) dev
+
+dev-backend: ## Start the API in watch mode (http://localhost:3001)
+	$(PNPM) --filter erp-backend start:dev
+
+dev-frontend: ## Same as dev
+	$(PNPM) dev
+
+build: ## Build both applications
+	$(PNPM) build
+	$(PNPM) --filter erp-backend build
+
+test: ## Run both test suites
+	$(PNPM) test:ci
+	$(PNPM) --filter erp-backend test
+
+lint: ## Lint both packages
+	$(PNPM) lint
+	$(PNPM) --filter erp-backend lint
+
+typecheck: ## Type-check the frontend
+	$(PNPM) exec tsc --noEmit
+
+db-apply: ## Apply scripts/ in order to $(DATABASE_URL)
+	@test -n "$(DATABASE_URL)" || (echo "Set DATABASE_URL first, e.g. postgresql://postgres:postgres@127.0.0.1:54322/postgres"; exit 1)
+	@for f in scripts/*.sql; do echo "  $$f"; psql "$(DATABASE_URL)" -v ON_ERROR_STOP=1 -q -f "$$f" || exit 1; done
+	@echo "Schema applied."
+
+docker-build: ## Build both images
+	docker compose build
+
+docker-up: ## Start both applications
+	docker compose up -d
 	@echo "Frontend: http://localhost:3000"
-	@echo "Backend: http://localhost:3001"
-	npm run dev
+	@echo "API:      http://localhost:3001/api/v1"
+	@echo "API docs: http://localhost:3001/api/docs"
 
-dev-backend: ## Start backend development server
-	cd backend && npm run start:dev
+docker-down: ## Stop them
+	docker compose down
 
-dev-frontend: ## Start frontend development server
-	npm run dev
+docker-logs: ## Follow the logs
+	docker compose logs -f
 
-# Build Commands
-build: ## Build production images
-	npm run build
-	cd backend && npm run build && cd ..
-	@echo "$(GREEN)✓ Build completed$(NC)"
-
-build-frontend: ## Build frontend only
-	npm run build
-
-build-backend: ## Build backend only
-	cd backend && npm run build
-
-# Linting & Testing
-lint: ## Run linter
-	npm run lint
-	cd backend && npm run lint && cd ..
-
-test: ## Run tests
-	npm test
-	cd backend && npm test && cd ..
-
-test-watch: ## Run tests in watch mode
-	npm test -- --watch
-
-# Docker Commands
-docker-build: ## Build Docker images
-	docker-compose build
-
-docker-build-prod: ## Build production Docker images
-	$(DOCKER_COMPOSE_PROD) build
-
-docker-up: ## Start Docker containers
-	docker-compose up -d
-	@echo "$(GREEN)✓ Docker containers started$(NC)"
-	@echo "Frontend: http://localhost:3000"
-	@echo "Backend: http://localhost:3001"
-	@echo "PostgreSQL: localhost:5432"
-	@echo "Redis: localhost:6379"
-
-docker-up-prod: ## Start production Docker containers
-	$(DOCKER_COMPOSE_PROD) up -d
-	@echo "$(GREEN)✓ Production containers started$(NC)"
-
-docker-down: ## Stop Docker containers
-	docker-compose down
-	@echo "$(GREEN)✓ Docker containers stopped$(NC)"
-
-docker-down-prod: ## Stop production Docker containers
-	$(DOCKER_COMPOSE_PROD) down
-
-docker-logs: ## Show Docker logs
-	docker-compose logs -f
-
-docker-logs-prod: ## Show production Docker logs
-	$(DOCKER_COMPOSE_PROD) logs -f
-
-docker-logs-backend: ## Show backend logs
-	docker-compose logs -f backend
-
-docker-logs-frontend: ## Show frontend logs
-	docker-compose logs -f frontend
-
-docker-logs-postgres: ## Show PostgreSQL logs
-	docker-compose logs -f postgres
-
-docker-shell-backend: ## Open backend container shell
-	docker-compose exec backend sh
-
-docker-shell-postgres: ## Open PostgreSQL container shell
-	docker-compose exec postgres psql -U postgres erp_db
-
-docker-shell-redis: ## Open Redis container shell
-	docker-compose exec redis redis-cli
-
-# Database Commands
-db-migrate: ## Run database migrations
-	docker-compose exec backend npm run migration:run
-
-db-seed: ## Seed database with demo data
-	docker-compose exec postgres psql -U postgres erp_db -f /docker-entrypoint-initdb.d/03-seed-demo-tenants.sql
-
-db-reset: ## Reset database (WARNING: deletes all data)
-	docker-compose down -v
-	docker-compose up -d postgres
-	sleep 10
-	docker-compose exec postgres psql -U postgres -d erp_db -f /docker-entrypoint-initdb.d/06-initialize-production-database.sql
-
-db-backup: ## Backup database
-	@mkdir -p ./backups
-	docker-compose exec -T postgres pg_dump -U postgres erp_db | gzip > ./backups/erp_db_$$(date +%Y%m%d_%H%M%S).sql.gz
-	@echo "$(GREEN)✓ Database backed up$(NC)"
-
-# Deployment Commands
-deploy: ## Deploy to production
-	@chmod +x ./deploy.sh
-	./deploy.sh
-
-deploy-dev: ## Deploy to development environment
-	docker-compose down
-	docker-compose build --no-cache
-	docker-compose up -d
-	sleep 30
-	docker-compose exec -T backend npm run migration:run
-	@echo "$(GREEN)✓ Development deployment completed$(NC)"
-
-# Cleanup Commands
-clean: ## Clean up build artifacts
-	rm -rf node_modules .next dist coverage
-	cd backend && rm -rf node_modules dist coverage && cd ..
-	@echo "$(GREEN)✓ Cleanup completed$(NC)"
-
-clean-docker: ## Clean up Docker resources
-	docker-compose down -v
-	docker system prune -a --volumes -f
-	@echo "$(GREEN)✓ Docker cleanup completed$(NC)"
-
-# Utility Commands
-status: ## Show service status
-	docker-compose ps
-
-health: ## Check service health
-	@echo "Checking services health..."
-	@curl -f http://localhost:3000 > /dev/null && echo "$(GREEN)✓ Frontend is healthy$(NC)" || echo "✗ Frontend is down"
-	@curl -f http://localhost:3001/health > /dev/null && echo "$(GREEN)✓ Backend is healthy$(NC)" || echo "✗ Backend is down"
-	@docker-compose exec -T postgres pg_isready -U postgres > /dev/null && echo "$(GREEN)✓ PostgreSQL is healthy$(NC)" || echo "✗ PostgreSQL is down"
-	@docker-compose exec -T redis redis-cli ping > /dev/null && echo "$(GREEN)✓ Redis is healthy$(NC)" || echo "✗ Redis is down"
-
-format: ## Format code
-	npx prettier --write .
-	cd backend && npx prettier --write src && cd ..
-
-# Development utilities
-shell: ## Open project shell
-	bash
-
-version: ## Show version information
-	@echo "Node.js: $$(node --version)"
-	@echo "npm: $$(npm --version)"
-	@echo "Docker: $$(docker --version)"
-	@echo "Docker Compose: $$(docker-compose --version)"
+clean: ## Remove build output and installed packages
+	rm -rf node_modules .next coverage backend/node_modules backend/dist backend/coverage

@@ -1,335 +1,208 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AlertCircle, Building2, Calendar, Mail, Phone, Shield } from "lucide-react"
+
+import { useAuth } from "@/components/auth/auth-provider"
+import { apiClient } from "@/lib/api-client"
+import { TENANT_ROLE_LABELS } from "@/lib/types"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Separator } from "@/components/ui/separator"
-import { Switch } from "@/components/ui/switch"
-import { User, Mail, Phone, MapPin, Calendar, Shield, Bell, Lock, Camera, Save, Edit } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
 
+/**
+ * The signed-in user's own profile.
+ *
+ * Everything here comes from GET /auth/profile and is saved with
+ * PATCH /users/:id, which the API allows against your own row.
+ *
+ * What this screen used to show: a hardcoded name, phone, position, department,
+ * address, join date and biography; toggles for email, push and SMS
+ * notifications; two-factor authentication, login alerts and a session timeout;
+ * and a "change password" form. None of it was connected to anything — Save
+ * called console.log — and none of it exists on the API. Position, address and
+ * biography are not columns; there is no notification preference table, no
+ * two-factor support, and no password-change endpoint. They are gone rather
+ * than left on screen pretending.
+ */
 export function ProfileManagement() {
-  const [isEditing, setIsEditing] = useState(false)
-  const [profile, setProfile] = useState({
-    name: "أحمد محمد علي",
-    email: "admin@company.com",
-    phone: "+966501234567",
-    position: "مدير النظام",
-    department: "تقنية المعلومات",
-    address: "الرياض، المملكة العربية السعودية",
-    joinDate: "2023-01-15",
-    bio: "مدير نظم معلومات مع خبرة 10 سنوات في إدارة الأنظمة المؤسسية",
-    avatar: "/professional-avatar.png",
-  })
+  const { user, refreshUser } = useAuth()
 
-  const [notifications, setNotifications] = useState({
-    email: true,
-    push: false,
-    sms: true,
-    reports: true,
+  const [values, setValues] = useState({
+    full_name: user?.full_name ?? "",
+    email: user?.email ?? "",
+    phone: user?.phone ?? "",
+    department: user?.department ?? "",
   })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
 
-  const [security, setSecurity] = useState({
-    twoFactor: true,
-    loginAlerts: true,
-    sessionTimeout: "30",
-  })
-
-  const handleSave = () => {
-    setIsEditing(false)
-    // Here you would typically save to backend
-    console.log("[v0] Profile saved:", profile)
+  if (!user) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    )
   }
 
-  const handleInputChange = (field: string, value: string) => {
-    setProfile((prev) => ({ ...prev, [field]: value }))
-  }
+  const displayName = user.full_name?.trim() || user.email
 
-  const handleNotificationChange = (field: string, value: boolean) => {
-    setNotifications((prev) => ({ ...prev, [field]: value }))
-  }
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
 
-  const handleSecurityChange = (field: string, value: string | boolean) => {
-    setSecurity((prev) => ({ ...prev, [field]: value }))
+    setSaving(true)
+    setError(null)
+    setSaved(false)
+
+    try {
+      // Blank optional fields are omitted rather than sent as "". The API
+      // validates email with @IsEmail, which rejects an empty string.
+      await apiClient.updateUser(user.id, {
+        full_name: values.full_name.trim() || undefined,
+        email: values.email.trim() || undefined,
+        phone: values.phone.trim() || undefined,
+        department: values.department.trim() || undefined,
+      })
+
+      await refreshUser()
+      setSaved(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save your profile")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
-    <div className="space-y-6" dir="rtl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">الملف الشخصي</h1>
-          <p className="text-slate-600">إدارة معلوماتك الشخصية وإعدادات الحساب</p>
-        </div>
-        <Button
-          onClick={() => (isEditing ? handleSave() : setIsEditing(true))}
-          className="bg-blue-600 hover:bg-blue-700"
-        >
-          {isEditing ? (
-            <>
-              <Save className="ml-2 h-4 w-4" />
-              حفظ التغييرات
-            </>
-          ) : (
-            <>
-              <Edit className="ml-2 h-4 w-4" />
-              تعديل الملف
-            </>
-          )}
-        </Button>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Profile</h1>
+        <p className="text-muted-foreground">Your account details.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Profile Overview */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-1">
           <CardHeader className="text-center">
-            <div className="relative mx-auto w-24 h-24">
-              <Avatar className="w-24 h-24">
-                <AvatarImage src={profile.avatar || "/placeholder.svg"} alt={profile.name} />
-                <AvatarFallback className="text-lg">
-                  {profile.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
-                </AvatarFallback>
-              </Avatar>
-              {isEditing && (
-                <Button size="sm" className="absolute -bottom-2 -right-2 rounded-full w-8 h-8 p-0" variant="secondary">
-                  <Camera className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-            <CardTitle className="text-xl">{profile.name}</CardTitle>
-            <CardDescription className="flex items-center justify-center gap-2">
-              <Badge variant="secondary">{profile.position}</Badge>
+            <Avatar className="mx-auto h-24 w-24">
+              <AvatarFallback className="text-lg">
+                {displayName.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <CardTitle className="text-xl">{displayName}</CardTitle>
+            <CardDescription className="flex justify-center">
+              <Badge variant={user.role === "admin" ? "default" : "secondary"}>
+                {user.role ? TENANT_ROLE_LABELS[user.role] : "Member"}
+              </Badge>
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-3 text-sm">
-              <Mail className="h-4 w-4 text-slate-500" />
-              <span>{profile.email}</span>
+          <CardContent className="space-y-4 text-sm">
+            <div className="flex items-center gap-3">
+              <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="truncate">{user.email}</span>
             </div>
-            <div className="flex items-center gap-3 text-sm">
-              <Phone className="h-4 w-4 text-slate-500" />
-              <span>{profile.phone}</span>
-            </div>
-            <div className="flex items-center gap-3 text-sm">
-              <MapPin className="h-4 w-4 text-slate-500" />
-              <span>{profile.address}</span>
-            </div>
-            <div className="flex items-center gap-3 text-sm">
-              <Calendar className="h-4 w-4 text-slate-500" />
-              <span>انضم في {new Date(profile.joinDate).toLocaleDateString("ar-SA")}</span>
+            {user.phone && (
+              <div className="flex items-center gap-3">
+                <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span>{user.phone}</span>
+              </div>
+            )}
+            {user.department && (
+              <div className="flex items-center gap-3">
+                <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span>{user.department}</span>
+              </div>
+            )}
+            {user.is_platform_admin && (
+              <div className="flex items-center gap-3">
+                <Shield className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span>Platform administrator</span>
+              </div>
+            )}
+            <div className="flex items-center gap-3">
+              <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="truncate text-muted-foreground">Tenant {user.tenant_id}</span>
             </div>
           </CardContent>
         </Card>
 
-        {/* Profile Details */}
         <Card className="lg:col-span-2">
-          <Tabs defaultValue="personal" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="personal">المعلومات الشخصية</TabsTrigger>
-              <TabsTrigger value="notifications">الإشعارات</TabsTrigger>
-              <TabsTrigger value="security">الأمان</TabsTrigger>
-            </TabsList>
+          <CardHeader>
+            <CardTitle>Edit your details</CardTitle>
+            <CardDescription>
+              Your role is set by an administrator and cannot be changed here.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
 
-            <TabsContent value="personal" className="space-y-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  المعلومات الأساسية
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">الاسم الكامل</Label>
-                    <Input
-                      id="name"
-                      value={profile.name}
-                      onChange={(e) => handleInputChange("name", e.target.value)}
-                      disabled={!isEditing}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">البريد الإلكتروني</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={profile.email}
-                      onChange={(e) => handleInputChange("email", e.target.value)}
-                      disabled={!isEditing}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">رقم الهاتف</Label>
-                    <Input
-                      id="phone"
-                      value={profile.phone}
-                      onChange={(e) => handleInputChange("phone", e.target.value)}
-                      disabled={!isEditing}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="position">المنصب</Label>
-                    <Input
-                      id="position"
-                      value={profile.position}
-                      onChange={(e) => handleInputChange("position", e.target.value)}
-                      disabled={!isEditing}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="department">القسم</Label>
-                    <Input
-                      id="department"
-                      value={profile.department}
-                      onChange={(e) => handleInputChange("department", e.target.value)}
-                      disabled={!isEditing}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="address">العنوان</Label>
-                    <Input
-                      id="address"
-                      value={profile.address}
-                      onChange={(e) => handleInputChange("address", e.target.value)}
-                      disabled={!isEditing}
-                    />
-                  </div>
-                </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="bio">نبذة شخصية</Label>
-                  <Textarea
-                    id="bio"
-                    value={profile.bio}
-                    onChange={(e) => handleInputChange("bio", e.target.value)}
-                    disabled={!isEditing}
-                    rows={3}
-                  />
-                </div>
-              </CardContent>
-            </TabsContent>
-
-            <TabsContent value="notifications" className="space-y-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bell className="h-5 w-5" />
-                  إعدادات الإشعارات
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>إشعارات البريد الإلكتروني</Label>
-                    <p className="text-sm text-slate-600">تلقي الإشعارات عبر البريد الإلكتروني</p>
-                  </div>
-                  <Switch
-                    checked={notifications.email}
-                    onCheckedChange={(checked) => handleNotificationChange("email", checked)}
-                  />
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>الإشعارات الفورية</Label>
-                    <p className="text-sm text-slate-600">تلقي الإشعارات الفورية في المتصفح</p>
-                  </div>
-                  <Switch
-                    checked={notifications.push}
-                    onCheckedChange={(checked) => handleNotificationChange("push", checked)}
-                  />
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>رسائل SMS</Label>
-                    <p className="text-sm text-slate-600">تلقي الإشعارات عبر الرسائل النصية</p>
-                  </div>
-                  <Switch
-                    checked={notifications.sms}
-                    onCheckedChange={(checked) => handleNotificationChange("sms", checked)}
-                  />
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>تقارير دورية</Label>
-                    <p className="text-sm text-slate-600">تلقي التقارير الدورية والإحصائيات</p>
-                  </div>
-                  <Switch
-                    checked={notifications.reports}
-                    onCheckedChange={(checked) => handleNotificationChange("reports", checked)}
-                  />
-                </div>
-              </CardContent>
-            </TabsContent>
-
-            <TabsContent value="security" className="space-y-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  إعدادات الأمان
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>المصادقة الثنائية</Label>
-                    <p className="text-sm text-slate-600">تفعيل المصادقة الثنائية لحماية إضافية</p>
-                  </div>
-                  <Switch
-                    checked={security.twoFactor}
-                    onCheckedChange={(checked) => handleSecurityChange("twoFactor", checked)}
-                  />
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>تنبيهات تسجيل الدخول</Label>
-                    <p className="text-sm text-slate-600">تلقي تنبيه عند تسجيل دخول جديد</p>
-                  </div>
-                  <Switch
-                    checked={security.loginAlerts}
-                    onCheckedChange={(checked) => handleSecurityChange("loginAlerts", checked)}
-                  />
-                </div>
-                <Separator />
-                <div className="space-y-2">
-                  <Label htmlFor="sessionTimeout">مهلة انتهاء الجلسة (بالدقائق)</Label>
+                  <Label htmlFor="full_name">Full name</Label>
                   <Input
-                    id="sessionTimeout"
-                    type="number"
-                    value={security.sessionTimeout}
-                    onChange={(e) => handleSecurityChange("sessionTimeout", e.target.value)}
-                    className="w-32"
+                    id="full_name"
+                    value={values.full_name}
+                    onChange={(event) =>
+                      setValues((prev) => ({ ...prev, full_name: event.target.value }))
+                    }
                   />
                 </div>
-                <Separator />
-                <div className="space-y-4">
-                  <Label>تغيير كلمة المرور</Label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="currentPassword">كلمة المرور الحالية</Label>
-                      <Input id="currentPassword" type="password" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="newPassword">كلمة المرور الجديدة</Label>
-                      <Input id="newPassword" type="password" />
-                    </div>
-                  </div>
-                  <Button variant="outline" className="w-full bg-transparent">
-                    <Lock className="ml-2 h-4 w-4" />
-                    تحديث كلمة المرور
-                  </Button>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={values.email}
+                    onChange={(event) =>
+                      setValues((prev) => ({ ...prev, email: event.target.value }))
+                    }
+                  />
                 </div>
-              </CardContent>
-            </TabsContent>
-          </Tabs>
+
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input
+                    id="phone"
+                    value={values.phone}
+                    onChange={(event) =>
+                      setValues((prev) => ({ ...prev, phone: event.target.value }))
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="department">Department</Label>
+                  <Input
+                    id="department"
+                    value={values.department}
+                    onChange={(event) =>
+                      setValues((prev) => ({ ...prev, department: event.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Button type="submit" disabled={saving}>
+                  {saving ? "Saving…" : "Save changes"}
+                </Button>
+                {saved && <span className="text-sm text-muted-foreground">Saved.</span>}
+              </div>
+            </form>
+          </CardContent>
         </Card>
       </div>
     </div>

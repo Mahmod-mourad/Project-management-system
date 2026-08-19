@@ -2,11 +2,13 @@
 
 import { useState } from "react"
 
-import type { User } from "@/hooks/use-users"
+import type { CreateUserInput, TenantRole, User } from "@/lib/types"
+import { TENANT_ROLE_LABELS } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -17,24 +19,40 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 interface UserDialogProps {
   open: boolean
+  /** The user being edited, or null to add somebody new. */
   user: User | null
+  /** Only an administrator may set a role; the API drops it from anyone else. */
+  canSetRole: boolean
   onOpenChange: (open: boolean) => void
   onSubmit: (values: Partial<User>) => Promise<void>
+  onCreate: (values: CreateUserInput) => Promise<void>
 }
 
-const ROLES = ["admin", "manager", "member"]
+const ROLES: TenantRole[] = ["admin", "manager", "member"]
 
-export function UserDialog({ open, user, onOpenChange, onSubmit }: UserDialogProps) {
+/** The API requires at least 8 characters, so the form should not let a shorter one through. */
+const MIN_PASSWORD_LENGTH = 8
+
+export function UserDialog({
+  open,
+  user,
+  canSetRole,
+  onOpenChange,
+  onSubmit,
+  onCreate,
+}: UserDialogProps) {
+  const isNew = user === null
+
   const [values, setValues] = useState(() => ({
     full_name: user?.full_name ?? "",
     email: user?.email ?? "",
     phone: user?.phone ?? "",
     department: user?.department ?? "",
-    role: user?.role ?? "member",
+    role: user?.role ?? ("member" as TenantRole),
+    password: "",
   }))
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -43,15 +61,30 @@ export function UserDialog({ open, user, onOpenChange, onSubmit }: UserDialogPro
     setError(null)
 
     try {
-      // Blank optional fields are omitted rather than sent as "". The API
-      // validates email with @IsEmail, which rejects an empty string.
-      await onSubmit({
-        full_name: values.full_name.trim() || undefined,
-        email: values.email.trim() || undefined,
-        phone: values.phone.trim() || undefined,
-        department: values.department.trim() || undefined,
-        role: values.role,
-      })
+      if (isNew) {
+        if (values.password.length < MIN_PASSWORD_LENGTH) {
+          throw new Error(`The password must be at least ${MIN_PASSWORD_LENGTH} characters`)
+        }
+
+        await onCreate({
+          email: values.email.trim(),
+          password: values.password,
+          full_name: values.full_name.trim(),
+          role: values.role,
+          phone: values.phone.trim() || undefined,
+          department: values.department.trim() || undefined,
+        })
+      } else {
+        // Blank optional fields are omitted rather than sent as "". The API
+        // validates email with @IsEmail, which rejects an empty string.
+        await onSubmit({
+          full_name: values.full_name.trim() || undefined,
+          email: values.email.trim() || undefined,
+          phone: values.phone.trim() || undefined,
+          department: values.department.trim() || undefined,
+          ...(canSetRole ? { role: values.role } : {}),
+        })
+      }
 
       onOpenChange(false)
     } catch (err) {
@@ -65,7 +98,12 @@ export function UserDialog({ open, user, onOpenChange, onSubmit }: UserDialogPro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Edit user</DialogTitle>
+          <DialogTitle>{isNew ? "Add user" : "Edit user"}</DialogTitle>
+          {isNew && (
+            <DialogDescription>
+              They are added to this tenant and can sign in straight away.
+            </DialogDescription>
+          )}
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -73,6 +111,7 @@ export function UserDialog({ open, user, onOpenChange, onSubmit }: UserDialogPro
             <Label htmlFor="full_name">Full name</Label>
             <Input
               id="full_name"
+              required={isNew}
               value={values.full_name}
               onChange={(event) =>
                 setValues((prev) => ({ ...prev, full_name: event.target.value }))
@@ -85,10 +124,30 @@ export function UserDialog({ open, user, onOpenChange, onSubmit }: UserDialogPro
             <Input
               id="email"
               type="email"
+              required={isNew}
               value={values.email}
               onChange={(event) => setValues((prev) => ({ ...prev, email: event.target.value }))}
             />
           </div>
+
+          {isNew && (
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                required
+                minLength={MIN_PASSWORD_LENGTH}
+                value={values.password}
+                onChange={(event) =>
+                  setValues((prev) => ({ ...prev, password: event.target.value }))
+                }
+              />
+              <p className="text-sm text-muted-foreground">
+                At least {MIN_PASSWORD_LENGTH} characters. Share it with them to sign in first time.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="phone">Phone</Label>
@@ -110,24 +169,28 @@ export function UserDialog({ open, user, onOpenChange, onSubmit }: UserDialogPro
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Role</Label>
-            <Select
-              value={values.role}
-              onValueChange={(value) => setValues((prev) => ({ ...prev, role: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ROLES.map((role) => (
-                  <SelectItem key={role} value={role}>
-                    {role}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {canSetRole && (
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Select
+                value={values.role}
+                onValueChange={(value) =>
+                  setValues((prev) => ({ ...prev, role: value as TenantRole }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROLES.map((role) => (
+                    <SelectItem key={role} value={role}>
+                      {TENANT_ROLE_LABELS[role]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
@@ -136,7 +199,7 @@ export function UserDialog({ open, user, onOpenChange, onSubmit }: UserDialogPro
               Cancel
             </Button>
             <Button type="submit" disabled={submitting}>
-              {submitting ? "Saving…" : "Save changes"}
+              {submitting ? "Saving…" : isNew ? "Add user" : "Save changes"}
             </Button>
           </DialogFooter>
         </form>

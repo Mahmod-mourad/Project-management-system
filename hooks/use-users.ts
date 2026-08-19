@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 
 import { apiClient } from "@/lib/api-client"
-import type { User } from "@/lib/types"
+import type { CreateUserInput, User } from "@/lib/types"
 
 export type { User }
 
@@ -31,6 +31,17 @@ export function useUsers() {
       setError(err instanceof Error ? err.message : "Failed to fetch users")
     } finally {
       setLoading(false)
+    }
+  }
+
+  /** Administrators only. The tenant comes from the session, not from here. */
+  const createUser = async (input: CreateUserInput) => {
+    try {
+      const created = await apiClient.createUser(input)
+      setUsers((prev) => [created, ...prev])
+      return created
+    } catch (err) {
+      throw err instanceof Error ? err : new Error("Failed to create user")
     }
   }
 
@@ -79,5 +90,5 @@ export function useUsers() {
     }
   }, [])
 
-  return { users, loading, error, fetchUsers, updateUser, deleteUser }
+  return { users, loading, error, fetchUsers, createUser, updateUser, deleteUser }
 }

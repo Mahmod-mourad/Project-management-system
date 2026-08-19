@@ -25,7 +25,7 @@ export class CreateTenantDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsObject()
-  settings?: Record<string, any>
+  settings?: Record<string, unknown>
 }
 
 export class UpdateTenantDto extends PartialType(CreateTenantDto) {}

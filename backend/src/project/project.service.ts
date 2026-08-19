@@ -6,14 +6,27 @@ import { CreateProjectDto, UpdateProjectDto } from "./dto/project.dto"
 export class ProjectService {
   constructor(private supabaseService: SupabaseService) {}
 
+  /**
+   * Creates a project and, if the request named any, its team.
+   *
+   * team_member_ids is a field on the DTO but never a column on projects. The
+   * old code spread the whole DTO into the insert, so any request that actually
+   * used the documented field failed on "column team_member_ids does not exist",
+   * and project_members was never written by anything.
+   */
   async create(tenantId: string, createProjectDto: CreateProjectDto) {
+    const { team_member_ids, ...projectColumns } = createProjectDto
+
     const { data, error } = await this.supabaseService.client
       .from("projects")
-      .insert({ ...createProjectDto, tenant_id: tenantId })
+      .insert({ ...projectColumns, tenant_id: tenantId })
       .select()
       .single()
 
     if (error) throw error
+
+    await this.replaceTeam(tenantId, data.id, team_member_ids)
+
     return data
   }
 
@@ -53,15 +66,20 @@ export class ProjectService {
   }
 
   async update(tenantId: string, id: string, updateProjectDto: UpdateProjectDto) {
+    const { team_member_ids, ...projectColumns } = updateProjectDto
+
     const { data, error } = await this.supabaseService.client
       .from("projects")
-      .update(updateProjectDto)
+      .update(projectColumns)
       .eq("tenant_id", tenantId)
       .eq("id", id)
       .select()
       .single()
 
     if (error) throw error
+
+    await this.replaceTeam(tenantId, id, team_member_ids)
+
     return data
   }
 
@@ -70,6 +88,41 @@ export class ProjectService {
 
     if (error) throw error
     return { message: "Project deleted successfully" }
+  }
+
+  /**
+   * Sets a project's team to exactly the given profiles, or leaves it alone when
+   * the request said nothing about the team.
+   *
+   * Only profiles inside the tenant are accepted, so naming somebody else's user
+   * id adds nobody rather than putting an outsider on the project.
+   */
+  private async replaceTeam(tenantId: string, projectId: string, memberIds?: string[]): Promise<void> {
+    if (memberIds === undefined) return
+
+    const { error: clearError } = await this.supabaseService.client
+      .from("project_members")
+      .delete()
+      .eq("project_id", projectId)
+
+    if (clearError) throw clearError
+
+    if (memberIds.length === 0) return
+
+    const { data: members, error: lookupError } = await this.supabaseService.client
+      .from("profiles")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .in("id", memberIds)
+
+    if (lookupError) throw lookupError
+    if (!members || members.length === 0) return
+
+    const { error: insertError } = await this.supabaseService.client
+      .from("project_members")
+      .insert(members.map((member) => ({ project_id: projectId, user_id: member.id })))
+
+    if (insertError) throw insertError
   }
 
   async getProjectStats(tenantId: string, projectId: string) {

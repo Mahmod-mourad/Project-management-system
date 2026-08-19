@@ -10,7 +10,7 @@ export interface Notification {
   message: string
   type: "info" | "success" | "warning" | "error"
   read: boolean
-  data?: any
+  data?: Record<string, unknown>
   created_at: string
 }
 

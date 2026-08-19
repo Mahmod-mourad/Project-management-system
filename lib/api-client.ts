@@ -4,6 +4,7 @@ import type {
   CreateProjectInput,
   CreateTenantInput,
   CreateTaskInput,
+  CreateUserInput,
   Project,
   ProjectStats,
   Task,
@@ -112,16 +113,6 @@ class ApiClient {
   // Auth endpoints
   async login(email: string, password: string) {
     const response = await this.client.post("/auth/login", { email, password })
-    return response.data
-  }
-
-  async register(userData: {
-    email: string
-    password: string
-    full_name: string
-    tenant_id: string
-  }) {
-    const response = await this.client.post("/auth/register", userData)
     return response.data
   }
 
@@ -247,12 +238,23 @@ class ApiClient {
     return response.data
   }
 
+  /**
+   * Adds a user to the signed-in tenant. Administrators only.
+   *
+   * This replaces register(), which posted to the public /auth/register with a
+   * tenant_id chosen by the caller. The tenant now comes from the session.
+   */
+  async createUser(input: CreateUserInput): Promise<User> {
+    const response = await this.client.post("/users", input)
+    return response.data
+  }
+
   async getUser(id: string) {
     const response = await this.client.get(`/users/${id}`)
     return response.data
   }
 
-  async updateUser(id: string, userData: any) {
+  async updateUser(id: string, userData: Partial<User>): Promise<User> {
     const response = await this.client.patch(`/users/${id}`, userData)
     return response.data
   }

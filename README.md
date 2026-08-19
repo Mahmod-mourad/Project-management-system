@@ -1,120 +1,157 @@
 # Project Management System
 
-A multi-tenant project management application: a Next.js frontend and a NestJS API sharing one
-pnpm workspace, backed by Supabase/PostgreSQL, with Docker Compose for local infrastructure and
-GitHub Actions for build and test.
+A multi-tenant project management application: a Next.js frontend and a NestJS API in one pnpm
+workspace, with Supabase for the database and authentication.
 
-This README describes what is actually implemented. Sections marked **UI only** are screens built
-against mock data with no API behind them yet.
+Everything described here is implemented. Every screen is backed by an endpoint that exists, and
+every endpoint is backed by a table the setup scripts create.
 
 ## Status
 
 | | |
 | --- | --- |
-| Frontend build | `pnpm build` passes — 15 routes |
-| Backend build | `pnpm --filter erp-backend build` passes |
-| Unit tests | 33 passing across 4 suites (frontend) + 8 across 2 suites (backend) |
-| Integration / E2E | Written, needs a running API — not part of CI |
-| Docker images | Frontend and backend images build from the repo root |
-| Deployment | Pipeline is authored but has never run against a live host |
+| Frontend | `pnpm build` passes — 10 routes, lint and `tsc --noEmit` clean |
+| Backend | `pnpm --filter erp-backend build` passes, lint clean |
+| Unit tests | 105 frontend across 7 suites, 46 backend across 8 |
+| Schema | `scripts/` applies cleanly to an empty PostgreSQL, twice over — checked in CI |
+| End to end | Sign-in, projects, tasks, users and the authorization rules exercised against a local Supabase |
+| Integration / E2E suites | Written; need a running API, so they are not in CI |
+| Deployment | None. There is no host, so there is no pipeline pretending to have one |
 
-## What is implemented
+## What it does
 
-**Backend (NestJS)** — modules with controllers, services, and DTOs:
+A tenant is a company. Everyone signs in to exactly one, and every query is scoped to it.
 
-- `auth` — registration, login, logout, profile, JWT guards
-- `tenant` — tenant records and per-tenant stats
-- `user` — user records scoped to a tenant
-- `project` — project CRUD and stats
-- `task` — task CRUD, filtering by project, grouping by status
-- `notification` — notification records
-- `supabase` — the shared data-access client
+- **Dashboard** — project and task counts, completion rate, overdue tasks, status breakdowns
+- **Projects** — list with search and status filter, create, edit, per-project stats, and a team
+- **Project detail** — one project's stats and its task board
+- **Tasks** — a board across to do, in progress, in review and completed. Dragging a card patches
+  the task optimistically and reverts if the request fails
+- **Users** — everyone in the tenant. Administrators add, edit and remove; everyone else can edit
+  their own row and nothing else
+- **Tenants** — every tenant on the platform, with counts. Platform administrators only
+- **Profile** — your own details
+- **Settings** — the tenant you belong to, and its usage
 
-**Frontend (Next.js App Router)** — wired to the API through `lib/api-client.ts`:
+An earlier version of this repository shipped seven more screens — companies, inventory, invoices,
+sales, HR, reports and subscriptions. Between them they made zero API calls across 4,165 lines:
+each rendered a hardcoded array. They were removed rather than left looking real. The backend has
+never had a module for any of them.
 
-- Login and profile
-- Tenant administration (`/admin/tenants`)
-- User management (`/users`)
-- Settings
+## Stack
 
-**UI only** — screens exist and render, but read from mock data and have no backend module:
-
-`/companies` · `/inventory` · `/invoices` · `/sales` · `/hr` · `/reports` · `/subscription`
-
-These are the next things to wire up. They are in the repository because the layout and component
-work is real; the data layer behind them is not.
-
-## Tech stack
-
-**Frontend** — Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, Radix UI, Socket.IO client
-**Backend** — NestJS, TypeScript, Passport/JWT, Supabase JS, class-validator
-**Data** — PostgreSQL 16, Redis 7, Supabase
-**Tooling** — pnpm workspace, Jest, React Testing Library, Docker Compose, Nginx, GitHub Actions
+**Frontend** — Next.js 16 (App Router), React 19, TypeScript, Tailwind, Radix UI, Socket.IO client
+**Backend** — NestJS 10, TypeScript, Passport/JWT, `@supabase/supabase-js`, class-validator
+**Data** — PostgreSQL, through Supabase's REST endpoint. The API opens no database connection of
+its own
+**Tooling** — pnpm workspace, Jest, React Testing Library, Docker, GitHub Actions
 
 ## Getting started
 
-Requires Node.js 22+ and pnpm 11 (`corepack enable` picks up the pinned version).
+Node.js 22 or newer, and pnpm 11 — `corepack enable` picks up the version pinned in
+`package.json`.
+
+### 1. A database
+
+The API talks to Supabase. Locally that is the Supabase CLI, which runs the whole stack in Docker:
 
 ```bash
-git clone https://github.com/Mahmod-mourad/Project-management-system.git
-cd Project-management-system
-
-pnpm install                      # installs both workspace packages
-cp .env.local.example .env.local  # fill in the Supabase keys
-
-pnpm dev                          # frontend on :3000
-pnpm --filter erp-backend start:dev   # API on :3001
+npx supabase init
+npx supabase start        # prints the API URL and the service role key
 ```
 
-With Docker instead:
+A hosted Supabase project works the same way; take the URL and service role key from its settings.
+
+### 2. The schema
+
+`scripts/` holds four SQL files, applied in order:
 
 ```bash
-docker compose up -d              # postgres, redis, backend, frontend, nginx
+export DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+make db-apply
+```
+
+PostgREST reads the schema once at startup, so tables created after Supabase is
+already running are invisible to it until you tell it to look again:
+
+```bash
+psql "$DATABASE_URL" -c "NOTIFY pgrst, 'reload schema';"
+```
+
+Without that, every request answers `PGRST205 — could not find the table`, which
+looks exactly like the schema not having been applied.
+
+`04-seed-demo-data.sql` creates a tenant with two accounts, both with the password
+`DemoPassword123!`:
+
+| Account | Role |
+| --- | --- |
+| `admin@demo.localhost` | tenant administrator, and platform administrator |
+| `member@demo.localhost` | member |
+
+The seeded ids are readable but still valid version 4 UUIDs — the `4` and `a` in
+the middle groups are load-bearing. `11111111-1111-1111-1111-111111111111` is not
+a UUID by RFC 4122; PostgreSQL stores it happily and the API's validators then
+reject it.
+
+There is no sign-up screen, and no public endpoint that creates one — see
+[SECURITY.md](SECURITY.md) for why. A tenant's first administrator comes from SQL; every account
+after that is added by an administrator from the Users screen.
+
+### 3. The applications
+
+```bash
+pnpm install
+
+cp .env.example .env.local                 # NEXT_PUBLIC_API_URL
+cp backend/.env.example backend/.env       # Supabase URL, service role key, JWT secret
+
+pnpm dev                                   # frontend on :3000
+pnpm --filter erp-backend start:dev        # API on :3001, docs at /api/docs
+```
+
+With Docker instead — the database still has to be up separately:
+
+```bash
+docker compose up -d --build
 ```
 
 ## Tests
 
 ```bash
 pnpm test              # frontend unit tests
-pnpm test:coverage     # the same, with the coverage gate
-pnpm test:backend      # NestJS service specs
-pnpm test:integration  # needs the API running — see below
+pnpm test:ci           # the same, with the coverage gate
+pnpm test:backend      # NestJS specs
+pnpm test:integration  # needs the API running
 ```
 
-Unit tests are the only suite in CI. The integration and E2E suites in `__tests__/integration/`
-and `__tests__/e2e/` make real HTTP calls, so they need the stack up first:
+Unit tests and the schema check are what CI runs. The suites in `__tests__/integration/` and
+`__tests__/e2e/` make real HTTP calls, so they need the stack up first.
 
-```bash
-docker compose up -d
-pnpm test:integration
-```
+Coverage thresholds are per file, on the modules that are actually covered — `lib/api-client.ts`,
+`lib/validators.ts` and `components/auth/auth-provider.tsx` — rather than a repo-wide number the
+suite could not meet. Raise them as tests are added.
 
-Coverage thresholds are scoped to the modules that are actually tested — `lib/api-client.ts`,
-`lib/validators.ts`, and `hooks/use-auth.tsx` — rather than a repo-wide number the suite could not
-meet. Raise them as tests are added.
+Backend specs run from `backend/` with ts-jest: the SWC transform Next.js uses at the root does not
+enable the decorator metadata NestJS depends on.
 
-Backend specs run from `backend/` with ts-jest, because the Next.js SWC transform used at the root
-does not enable the decorator support NestJS relies on.
-
-## Project layout
+## Layout
 
 ```text
 app/                 Next.js App Router routes
 components/          UI components, grouped by feature
-hooks/               React hooks, including the auth provider
-lib/                 API client, validators, shared helpers
-backend/src/         NestJS modules (auth, tenant, user, project, task, notification)
+hooks/               data-fetching hooks, one per resource
+lib/                 API client, types, validators, helpers
+backend/src/         NestJS modules: auth, tenant, user, project, task, notification
+scripts/             the SQL that builds the database, in order
 __tests__/           unit tests; integration/ and e2e/ run separately
-supabase/            SQL initialization scripts
-.github/workflows/   build and test on push; deploy is manual
+.github/workflows/   build, lint, test, and apply the schema
 ```
 
-## Deployment
+## More
 
-`.github/workflows/deploy.yml` builds and pushes both images to Docker Hub and deploys over SSH.
-It runs on `workflow_dispatch` only, because it needs `DOCKER_USERNAME`, `DOCKER_PASSWORD`, and a
-`PRODUCTION_HOST` that do not exist yet. Treat it as pipeline configuration, not as evidence of a
-running production deployment.
+- [ARCHITECTURE.md](ARCHITECTURE.md) — how a request travels, and why the pieces are arranged this way
+- [SECURITY.md](SECURITY.md) — the tenant boundary, and the holes that used to be in it
 
 ## License
 

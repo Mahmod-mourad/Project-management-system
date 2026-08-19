@@ -79,22 +79,22 @@ export class NotificationGateway implements OnGatewayConnection, OnGatewayDiscon
   }
 
   // Send notification to specific user
-  sendToUser(userId: string, event: string, data: any) {
+  sendToUser(userId: string, event: string, data: unknown) {
     this.server.to(`user:${userId}`).emit(event, data)
   }
 
   // Send notification to all users in a tenant
-  sendToTenant(tenantId: string, event: string, data: any) {
+  sendToTenant(tenantId: string, event: string, data: unknown) {
     this.server.to(`tenant:${tenantId}`).emit(event, data)
   }
 
   // Send notification to all users in a project
-  sendToProject(projectId: string, event: string, data: any) {
+  sendToProject(projectId: string, event: string, data: unknown) {
     this.server.to(`project:${projectId}`).emit(event, data)
   }
 
   // Broadcast system-wide notifications
-  broadcast(event: string, data: any) {
+  broadcast(event: string, data: unknown) {
     this.server.emit(event, data)
   }
 }

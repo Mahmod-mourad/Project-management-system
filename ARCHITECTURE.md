@@ -20,7 +20,7 @@ goes through it.
 
 ## A request, end to end
 
-`PATCH /api/v1/tasks/:id`, from a card dropped into a different column:
+`PATCH /api/v1/tasks/:id`, from moving a card to another column on the board:
 
 1. `hooks/use-tasks.ts` calls `apiClient.updateTask(id, { status })`.
 2. The api-client request interceptor attaches `Authorization: Bearer <token>` and
@@ -32,8 +32,10 @@ goes through it.
 5. `ValidationPipe` turns the body into an `UpdateTaskDto`, rejecting unknown fields outright
    (`whitelist` and `forbidNonWhitelisted` are both on).
 6. `TaskService.update` issues the Supabase query, scoped by both `tenant_id` and `id`.
-7. The response comes back up. On failure the api-client response interceptor turns the axios error
-   into a plain `Error` with the server's message, and the board reverts the card.
+7. The response comes back up, and the hook replaces the task with the row the API returned. On
+   failure the api-client response interceptor turns the axios error into a plain `Error` carrying
+   the server's message, and the board is left untouched — the card never moved, so there is
+   nothing to undo.
 
 Step 4 is the whole multi-tenancy story. The header is client-supplied, so checking only that the
 tenant exists would let any signed-in user read another tenant's data by changing one header. It
@@ -106,7 +108,7 @@ the triggers in `03-notifications.sql`, so a task assigned by any path produces 
 
 - `app/` — routes. Each wraps its screen in `ProtectedRoute` and `DashboardLayout`.
 - `components/<feature>/` — the screen for that feature.
-- `hooks/use-<resource>.ts` — fetching, mutation and optimistic state for one resource.
+- `hooks/use-<resource>.ts` — fetching and mutation for one resource. Mutations apply the row the API returns rather than guessing at it, so the screen and the database cannot disagree.
 - `lib/types.ts` — the shapes the API returns. The enums mirror the DTO enums, so a value that
   type-checks is a value the API accepts.
 - `lib/api-client.ts` — every HTTP call, plus the two interceptors that attach the session and

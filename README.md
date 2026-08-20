@@ -25,8 +25,9 @@ A tenant is a company. Everyone signs in to exactly one, and every query is scop
 - **Dashboard** — project and task counts, completion rate, overdue tasks, status breakdowns
 - **Projects** — list with search and status filter, create, edit, per-project stats, and a team
 - **Project detail** — one project's stats and its task board
-- **Tasks** — a board across to do, in progress, in review and completed. Dragging a card patches
-  the task optimistically and reverts if the request fails
+- **Tasks** — a board across to do, in progress, in review and completed, filterable by priority.
+  Each card carries a status control that moves it to another column; the board updates from the
+  API's response, and a failed move leaves the card where it was
 - **Users** — everyone in the tenant. Administrators add, edit and remove; everyone else can edit
   their own row and nothing else
 - **Tenants** — every tenant on the platform, with counts. Platform administrators only

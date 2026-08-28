@@ -7,6 +7,7 @@ import { ProjectModule } from "./project/project.module"
 import { TaskModule } from "./task/task.module"
 import { NotificationModule } from "./notification/notification.module"
 import { SupabaseModule } from "./supabase/supabase.module"
+import { HealthController } from "./health/health.controller"
 
 @Module({
   imports: [
@@ -22,5 +23,6 @@ import { SupabaseModule } from "./supabase/supabase.module"
     TaskModule,
     NotificationModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}

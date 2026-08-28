@@ -3,10 +3,10 @@ services:
     name: pms-api
     runtime: node
     plan: free
-    buildCommand: corepack enable && cd backend && npm ci && npm run build
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter erp-backend build
     startCommand: cd backend && npm run start:prod
     rootDir: .
-    healthCheckPath: /health
+    healthCheckPath: /api/v1/health
     envVars:
       - key: NODE_ENV
         value: production

@@ -80,3 +80,5 @@ volumes/
 
 # PM2 logs
 ecosystem-generated.config.js
+.vercel
+.env*

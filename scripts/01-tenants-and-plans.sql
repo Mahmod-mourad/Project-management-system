@@ -43,7 +43,10 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     current_period_start TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     current_period_end TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW() + INTERVAL '1 month',
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    -- Unique because the seed upserts on it. Without the constraint the
+    -- seed's ON CONFLICT is ineffective and every run adds a duplicate.
+    UNIQUE (tenant_id, plan_id)
 );
 
 CREATE TABLE IF NOT EXISTS usage_tracking (

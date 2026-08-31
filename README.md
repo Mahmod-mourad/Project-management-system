@@ -3,20 +3,80 @@
 A multi-tenant project management application: a Next.js frontend and a NestJS API in one pnpm
 workspace, with Supabase for the database and authentication.
 
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js&logoColor=white)](https://nextjs.org)
+[![NestJS](https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs&logoColor=white)](https://nestjs.com)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript&logoColor=white)](https://typescriptlang.org)
+[![PostgreSQL](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com)
+[![JWT](https://img.shields.io/badge/auth-JWT-000000?logo=jsonwebtokens)](https://jwt.io)
+[![Socket.IO](https://img.shields.io/badge/real--time-Socket.IO-010101?logo=socket.io)](https://socket.io)
+[![Jest](https://img.shields.io/badge/tests-Jest-C21325?logo=jest&logoColor=white)](https://jestjs.io)
+
 Everything described here is implemented. Every screen is backed by an endpoint that exists, and
 every endpoint is backed by a table the setup scripts create.
+
+---
+
+## Screenshots
+
+Logged in with the demo account, against the seeded database — 6 users, 8 projects, 28 tasks and
+a live notification inbox.
+
+### Dashboard
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+*Project and task counts, completion rate, overdue tasks, and per-status/per-project breakdowns.*
+
+### Projects
+
+![Projects](docs/screenshots/projects.png)
+
+*All 8 seeded projects — search, status filter, and every lifecycle state from planning to cancelled.*
+
+### Project detail
+
+![Project detail](docs/screenshots/project-detail.png)
+
+*One project's stats, team, and its task board.*
+
+### Tasks
+
+![Tasks](docs/screenshots/tasks.png)
+
+*The task board across to do, in progress, in review and completed — 28 tasks with priority and due dates.*
+
+### Users
+
+![Users](docs/screenshots/users.png)
+
+*The 6 tenant users — admins, managers and members.*
+
+### Notifications
+
+![Notifications](docs/screenshots/notifications.png)
+
+*Assignment alerts, project updates and overdue warnings — the inbox the triggers in `scripts/03-notifications.sql` populate.*
+
+### Sign in
+
+![Sign in](docs/screenshots/login.png)
+
+*The demo login screen — accounts are created by an administrator, there is no public sign-up.*
+
+---
 
 ## Status
 
 | | |
 | --- | --- |
+| Live demo | [pms-web-lilac.vercel.app](https://pms-web-lilac.vercel.app) |
 | Frontend | `pnpm build` passes — 10 routes, lint and `tsc --noEmit` clean |
 | Backend | `pnpm --filter erp-backend build` passes, lint clean |
 | Unit tests | 105 frontend across 7 suites, 46 backend across 8 |
 | Schema | `scripts/` applies cleanly to an empty PostgreSQL, twice over — checked in CI |
 | End to end | Sign-in, projects, tasks, users and the authorization rules exercised against a local Supabase |
 | Integration / E2E suites | Written; need a running API, so they are not in CI |
-| Deployment | None. There is no host, so there is no pipeline pretending to have one |
+| Deployment | Frontend on Vercel. The API has no host — it runs locally against a local or hosted Supabase |
 
 ## What it does
 
@@ -82,13 +142,16 @@ psql "$DATABASE_URL" -c "NOTIFY pgrst, 'reload schema';"
 Without that, every request answers `PGRST205 — could not find the table`, which
 looks exactly like the schema not having been applied.
 
-`04-seed-demo-data.sql` creates a tenant with two accounts, both with the password
-`DemoPassword123!`:
+`04-seed-demo-data.sql` seeds one tenant with six accounts, all with the password `DemoPassword123!`:
 
 | Account | Role |
 | --- | --- |
 | `admin@demo.localhost` | tenant administrator, and platform administrator |
 | `member@demo.localhost` | member |
+| `sara@demo.localhost` | manager (Design) |
+| `omar@demo.localhost` | member (Engineering) |
+| `laila@demo.localhost` | manager (Marketing) |
+| `youssef@demo.localhost` | manager (Engineering) |
 
 The seeded ids are readable but still valid version 4 UUIDs — the `4` and `a` in
 the middle groups are load-bearing. `11111111-1111-1111-1111-111111111111` is not

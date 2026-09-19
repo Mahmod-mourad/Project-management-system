@@ -69,14 +69,13 @@ a live notification inbox.
 
 | | |
 | --- | --- |
-| Live demo | [pms-web-lilac.vercel.app](https://pms-web-lilac.vercel.app) |
 | Frontend | `pnpm build` passes — 10 routes, lint and `tsc --noEmit` clean |
 | Backend | `pnpm --filter erp-backend build` passes, lint clean |
 | Unit tests | 105 frontend across 7 suites, 46 backend across 8 |
 | Schema | `scripts/` applies cleanly to an empty PostgreSQL, twice over — checked in CI |
 | End to end | Sign-in, projects, tasks, users and the authorization rules exercised against a local Supabase |
 | Integration / E2E suites | Written; need a running API, so they are not in CI |
-| Deployment | Frontend on Vercel. The API has no host — it runs locally against a local or hosted Supabase |
+| Deployment | No functional public demo. A frontend preview exists on Vercel, but the API has no host; use the local run guide below |
 
 ## What it does
 
